@@ -10,7 +10,6 @@ export interface Config {
     clientId: string;
     secret: string;
     env: PlaidEnvName;
-    redirectUri: string | undefined;
   };
 }
 
@@ -26,7 +25,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       clientId: env.PLAID_CLIENT_ID ?? '',
       secret: env.PLAID_SECRET ?? '',
       env: plaidEnv,
-      redirectUri: env.PLAID_REDIRECT_URI || undefined,
     },
   };
 }

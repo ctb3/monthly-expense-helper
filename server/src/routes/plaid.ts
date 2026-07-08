@@ -10,12 +10,13 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
   app.post('/api/plaid/link-token', async (req, reply) => {
     const { itemId } = (req.body ?? {}) as { itemId?: number };
     try {
+      // No redirect_uri: desktop-web Link handles OAuth institutions (incl. Amex)
+      // in a popup. Only mobile webviews would need a registered redirect URI.
       const base = {
         user: { client_user_id: 'local-user' },
         client_name: 'Monthly Expense Helper',
         country_codes: [CountryCode.Us],
         language: 'en',
-        ...(config.plaid.redirectUri ? { redirect_uri: config.plaid.redirectUri } : {}),
       };
       const resp = itemId
         ? await plaid.linkTokenCreate({

@@ -3,13 +3,9 @@ import { usePlaidLink } from 'react-plaid-link';
 import { api, type Item } from '../api';
 import type { PageProps } from '../App';
 
-const LINK_TOKEN_KEY = 'meh_link_token';
-const LINK_MODE_KEY = 'meh_link_mode'; // 'new' or the item id being re-linked
-
 interface LaunchState {
   token: string;
-  mode: string; // 'new' | item id
-  receivedRedirectUri?: string;
+  mode: string; // 'new' | item id being re-linked
 }
 
 export function Accounts({ onAuthError }: PageProps) {
@@ -29,13 +25,6 @@ export function Accounts({ onAuthError }: PageProps) {
 
   useEffect(() => {
     void load();
-    // Returning from an OAuth institution (e.g. Amex): resume Link with the stored token.
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('oauth_state_id')) {
-      const token = localStorage.getItem(LINK_TOKEN_KEY);
-      const mode = localStorage.getItem(LINK_MODE_KEY) ?? 'new';
-      if (token) setLaunch({ token, mode, receivedRedirectUri: window.location.href });
-    }
   }, [load]);
 
   const startLink = async (itemId?: number) => {
@@ -46,10 +35,7 @@ export function Accounts({ onAuthError }: PageProps) {
         method: 'POST',
         body: itemId ? { itemId } : {},
       });
-      const mode = itemId ? String(itemId) : 'new';
-      localStorage.setItem(LINK_TOKEN_KEY, link_token);
-      localStorage.setItem(LINK_MODE_KEY, mode);
-      setLaunch({ token: link_token, mode });
+      setLaunch({ token: link_token, mode: itemId ? String(itemId) : 'new' });
     } catch (err) {
       if (!onAuthError(err)) setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -58,9 +44,6 @@ export function Accounts({ onAuthError }: PageProps) {
   };
 
   const finishLink = async (publicToken: string | null, institutionName: string | null) => {
-    localStorage.removeItem(LINK_TOKEN_KEY);
-    localStorage.removeItem(LINK_MODE_KEY);
-    window.history.replaceState({}, '', window.location.pathname);
     const mode = launch?.mode ?? 'new';
     setLaunch(null);
     try {
@@ -274,7 +257,6 @@ function PlaidLauncher({
 }) {
   const { open, ready } = usePlaidLink({
     token: launch.token,
-    receivedRedirectUri: launch.receivedRedirectUri,
     onSuccess: (publicToken, metadata) =>
       onDone(publicToken, metadata.institution?.name ?? null),
     onExit: () => onDone(null, null),

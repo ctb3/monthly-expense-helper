@@ -30,9 +30,9 @@ npm run dev            # server :8080, client :5173 (proxied)
   seed category suggestions.
 - Test the full flow with `PLAID_ENV=sandbox` first (institution: any, credentials
   `user_good` / `pass_good`) — sandbox links don't consume free-trial connections.
-- Switch to `PLAID_ENV=production` and link Amex for real data. Amex uses OAuth and
-  needs an HTTPS redirect URI registered in the Plaid dashboard — see
-  `docs/deploy-proxmox.md`.
+- Switch to `PLAID_ENV=production` and link Amex for real data. OAuth institutions
+  (Amex included) authenticate in a browser popup — no redirect URI setup needed on
+  desktop web. Amex consent expires yearly; use Re-link when sync starts failing.
 
 ## Commands
 

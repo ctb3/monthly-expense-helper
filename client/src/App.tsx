@@ -6,12 +6,10 @@ import { Accounts } from './pages/Accounts';
 
 type Tab = 'transactions' | 'accounts';
 
-const isOAuthReturn = new URLSearchParams(window.location.search).has('oauth_state_id');
-
 export function App() {
   const [status, setStatus] = useState<StatusResp | null>(null);
   const [unlocked, setUnlocked] = useState(false);
-  const [tab, setTab] = useState<Tab>(isOAuthReturn ? 'accounts' : 'transactions');
+  const [tab, setTab] = useState<Tab>('transactions');
 
   useEffect(() => {
     api<StatusResp>('/api/status').then((s) => {

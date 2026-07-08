@@ -39,15 +39,12 @@ Open `http://<vm-ip>:8080`, set the vault passphrase on first run.
   history is in plaintext).
 - **Updates**: `git pull && docker compose up -d --build`.
 
-## Amex / OAuth redirect
+## Amex / OAuth institutions
 
-Amex links through OAuth, which requires an HTTPS redirect URI registered in the Plaid
-dashboard (Developers → API → Allowed redirect URIs). Two options:
+OAuth institutions (Amex included) authenticate in a **browser popup** on desktop web —
+no redirect URI registration needed. Just click Link on the Accounts page from a
+desktop browser and allow popups. A registered HTTPS redirect URI (Plaid dashboard →
+Developers → API → Allowed redirect URIs) only becomes necessary if you ever link from
+a mobile webview.
 
-1. Put a reverse proxy with a self-signed or LAN cert in front (e.g. Caddy on
-   `https://expense.lan`) and register that URL as `PLAID_REDIRECT_URI`.
-2. Do the initial Amex link from your desktop against a locally-running instance
-   (`https://localhost:8443` via a local proxy), then keep syncing from the Proxmox
-   deployment — the access token works from anywhere your keys do.
-
-Non-OAuth institutions link without any redirect URI.
+Amex consent expires annually: when its sync starts failing, use the Re-link button.
