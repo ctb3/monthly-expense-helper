@@ -1,0 +1,14 @@
+{
+  "Housing": ["Rent", "Mortgage", "Insurance", "Maintenance"],
+  "Food": ["Groceries", "Bar/Restaurant", "Delivery"],
+  "Transportation": ["Car", "Maintenance", "Fuel", "Parking", "RideShare", "Insurance", "Recuring"],
+  "Utility": ["Internet", "Energy", "Cell", "Water"],
+  "Health": ["Insurance", "Medicine", "Copay", "Hygene"],
+  "Fitness": ["Gym/Subscriptions", "Race", "Equipment"],
+  "Kids": ["Kids"],
+  "Pet": ["Vet", "Food", "Treats", "Toys", "Insurance", "Other"],
+  "HomeAndGarden": ["Furniture", "Garden", "Appliances", "Other"],
+  "Luxury": ["Games", "Streaming", "Electronics", "Gifts", "Clothes", "Events", "Other"],
+  "Vacation": ["Lodging", "Plane", "Events", "Transportation", "Camping", "Other"],
+  "Charity": ["Charity"]
+}

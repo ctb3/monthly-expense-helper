@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    ports:
+      # LAN-only by design: bind to the host's LAN address or use a firewall;
+      # nothing here should ever be exposed to the internet.
+      - "8080:8080"
+    env_file: .env
+    environment:
+      DB_PATH: /data/expense.db
+    volumes:
+      - expense-data:/data
+    restart: unless-stopped
+
+volumes:
+  expense-data:
