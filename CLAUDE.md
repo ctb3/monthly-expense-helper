@@ -24,8 +24,18 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
   User picks and hide/unhide decisions write back via `learn`/`learnIgnore`.
 - `server/src/routes/export.ts` — export bakes unsaved suggestions in; excludes hidden
   rows (`transactions.ignored` tri-state: NULL=auto, 1=hide, 0=keep).
+- `server/src/cards.ts` + `server/src/routes/cards.ts` — credit-card payment dashboard.
+  `GET /api/cards/dashboard` computes per-card/per-month status live (green=paid,
+  yellow=due ≤7d, red=late, neutral=no data); window is prev 2 + current + next month.
+  Status precedence (pure logic in `cards.ts`): manual override > liability payment >
+  zero statement balance > due-date color. `syncLiabilities` (in `plaid/sync.ts`)
+  fetches `/liabilities/get` after txn sync and never throws — marks the item
+  `liabilities_status='unavailable'` on any failure so txn sync is unaffected. Snapshot
+  fields are appended to `card_events` for history (snapshot API only reports latest).
 - `client/src/pages/Transactions.tsx` — single main table; edits save instantly, no
   approve/review flow (user explicitly removed it — don't reintroduce).
+- `client/src/pages/Dashboard.tsx` — payment grid, default tab. Card-confirmed cells
+  (payment or zero balance) are locked; other cells toggle auto ↔ manually-paid on click.
 
 ## Invariants / gotchas
 
@@ -35,7 +45,8 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
   (match the sheet). Do not fix.
 - `.env` (Plaid production keys) and `data/*.csv` (real financial history) are
   gitignored — keep it that way; never log tokens (see `server/src/redact.ts`).
-- Plaid: free-trial account, 10 real connections (1 used: Amex). Sandbox for testing
+- Plaid: free-trial account, 10 real connections (5 used: amex, citi, chase, usbank,
+  pnc; chase liabilities came back `unavailable`). Sandbox for testing
   (`user_good`/`pass_good`). OAuth works via desktop popup — no redirect URI (removed;
   in git history if mobile webview linking ever needed). Amex consent expires annually
   → Re-link button on Accounts.
@@ -44,8 +55,12 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
   browser can't reach it.
 - Suggestions are computed live on GET; only user-picked categories persist. Table and
   export always agree by construction.
+- Dashboard liabilities key off `last_statement_balance` (a balance ≤ 0 = settled,
+  shown green): Plaid sandbox reports `minimum_payment_amount = 0` for every card, so
+  that field is useless as a "nothing owed" signal. Link token requests Liabilities as
+  `optional_products` (new link) / `additional_consented_products` (re-link) so cards
+  lacking the product still link; re-link to grant consent if status stays `unavailable`.
 
 ## Deferred features (user wants eventually, not yet)
 
-- Amazon order-history enrichment; checking-account "all cards paid" dashboard;
-  additional institutions (citi, usbank, chase, pnc) via the same pipeline.
+- Amazon order-history enrichment.
