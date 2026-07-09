@@ -123,7 +123,17 @@ export function Transactions({ onAuthError }: PageProps) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <TxnRow key={r.id} row={r} taxonomy={taxonomy} onReload={load} onAuthError={onAuthError} />
+            <TxnRow
+              key={r.id}
+              row={r}
+              taxonomy={taxonomy}
+              onIgnoredChange={(ignored) =>
+                setRows((prev) =>
+                  prev.map((row) => (row.id === r.id ? { ...row, ignored: ignored ? 1 : 0 } : row)),
+                )
+              }
+              onAuthError={onAuthError}
+            />
           ))}
           {rows.length === 0 && (
             <tr>
@@ -176,12 +186,12 @@ function DownloadMenu({ urlFor }: { urlFor: (format: 'csv' | 'tsv') => string })
 function TxnRow({
   row,
   taxonomy,
-  onReload,
+  onIgnoredChange,
   onAuthError,
 }: {
   row: Txn;
   taxonomy: Taxonomy;
-  onReload: () => Promise<void>;
+  onIgnoredChange: (ignored: boolean) => void;
   onAuthError: (err: unknown) => boolean;
 }) {
   const [category, setCategory] = useState(row.category ?? row.suggestion?.category ?? '');
@@ -205,7 +215,7 @@ function TxnRow({
     setError(null);
     try {
       await api(`/api/transactions/${row.id}`, { method: 'PATCH', body: patch });
-      if (patch.ignored !== undefined) await onReload();
+      if (patch.ignored !== undefined) onIgnoredChange(patch.ignored);
     } catch (err) {
       if (!onAuthError(err)) setError(err instanceof Error ? err.message : String(err));
     }

@@ -136,13 +136,10 @@ export function Accounts({ onAuthError }: PageProps) {
           <table className="accounts">
             <thead>
               <tr>
+                <th>Label</th>
                 <th>Account</th>
                 <th>Mask</th>
                 <th>Type</th>
-                <th>
-                  Sheet source label{' '}
-                  <span className="muted">(the “Source” column in your spreadsheet)</span>
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -183,13 +180,13 @@ function AccountRow({
 
   return (
     <tr>
-      <td>{account.name}</td>
-      <td>{account.mask ?? '—'}</td>
-      <td>{account.subtype ?? account.type ?? '—'}</td>
       <td>
         <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={save} />
         {saved && <span className="badge conf-high">saved</span>}
       </td>
+      <td>{account.name}</td>
+      <td>{account.mask ?? '—'}</td>
+      <td>{account.subtype ?? account.type ?? '—'}</td>
     </tr>
   );
 }
