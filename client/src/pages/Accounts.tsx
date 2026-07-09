@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { usePlaidLink } from 'react-plaid-link';
 import { api, type Item } from '../api';
 import type { PageProps } from '../App';
-
-interface LaunchState {
-  token: string;
-  mode: string; // 'new' | item id being re-linked
-}
+import { PlaidLauncher, type LaunchState } from '../components/PlaidLauncher';
 
 export function Accounts({ onAuthError }: PageProps) {
   const [items, setItems] = useState<Item[]>([]);
@@ -277,25 +272,4 @@ function HistoryImport({ onAuthError }: PageProps) {
       )}
     </details>
   );
-}
-
-function PlaidLauncher({
-  launch,
-  onDone,
-}: {
-  launch: LaunchState;
-  onDone: (publicToken: string | null, institutionName: string | null) => void;
-}) {
-  const { open, ready } = usePlaidLink({
-    token: launch.token,
-    onSuccess: (publicToken, metadata) =>
-      onDone(publicToken, metadata.institution?.name ?? null),
-    onExit: () => onDone(null, null),
-  });
-
-  useEffect(() => {
-    if (ready) open();
-  }, [ready, open]);
-
-  return <p className="info">Opening Plaid Link…</p>;
 }

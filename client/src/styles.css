@@ -101,6 +101,16 @@ input.note { width: 100%; min-width: 14rem; }
 .cell-upcoming, .cell-unknown { color: var(--muted); }
 .override-dot { margin-left: 0.2rem; opacity: 0.7; }
 
+.card-name { display: flex; align-items: center; gap: 0.45rem; }
+.sync-dot { flex: none; width: 0.7rem; height: 0.7rem; padding: 0; border-radius: 50%; border: none; }
+.sync-dot-ok { background: var(--ok); }
+.sync-dot-bad { background: var(--danger); cursor: pointer; box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent); animation: sync-dot-pulse 1.8s ease-out infinite; }
+.sync-dot-bad:hover { outline: 2px solid var(--danger); outline-offset: 1px; }
+@keyframes sync-dot-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent); }
+  100% { box-shadow: 0 0 0 6px transparent; }
+}
+
 .narrow { max-width: 640px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
 .form-grid label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: var(--muted); }

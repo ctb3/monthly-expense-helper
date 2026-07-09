@@ -11,6 +11,15 @@ export function redact(text: string): string {
   return out;
 }
 
+/** Plaid `error_code` off an SDK error (`response.data.error_code`), or null. */
+export function plaidErrorCode(err: unknown): string | null {
+  if (err && typeof err === 'object') {
+    const data = (err as { response?: { data?: { error_code?: string } } }).response?.data;
+    if (data?.error_code) return data.error_code;
+  }
+  return null;
+}
+
 /** Safe one-line message from an unknown error, never the full (payload-bearing) object. */
 export function errorMessage(err: unknown): string {
   if (err && typeof err === 'object') {

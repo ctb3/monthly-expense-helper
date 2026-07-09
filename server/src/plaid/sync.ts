@@ -1,7 +1,7 @@
 import type { PlaidApi, Transaction, AccountBase, RemovedTransaction } from 'plaid';
 import type { Db } from '../db/index.js';
 import type { Vault } from '../crypto/vault.js';
-import { errorMessage } from '../redact.js';
+import { errorMessage, plaidErrorCode } from '../redact.js';
 
 export interface SyncResult {
   added: number;
@@ -31,31 +31,40 @@ export async function syncItem(
 
   let cursor = item.cursor ?? undefined;
   let hasMore = true;
-  while (hasMore) {
-    const resp = await plaid.transactionsSync({
-      access_token: accessToken,
-      cursor,
-      count: 500,
-    });
-    const data = resp.data;
-    upsertAccounts(db, item.id, item.institution_name, data.accounts);
-    db.transaction(() => {
-      for (const t of data.added) {
-        upsertTransaction(db, t);
-        result.added++;
-      }
-      for (const t of data.modified) {
-        upsertTransaction(db, t);
-        result.modified++;
-      }
-      for (const r of data.removed) {
-        applyRemoved(db, r);
-        result.removed++;
-      }
-      cursor = data.next_cursor;
-      db.prepare('SELECT 1').get(); // keep transaction non-empty even on empty page
-    })();
-    hasMore = data.has_more;
+  try {
+    while (hasMore) {
+      const resp = await plaid.transactionsSync({
+        access_token: accessToken,
+        cursor,
+        count: 500,
+      });
+      const data = resp.data;
+      upsertAccounts(db, item.id, item.institution_name, data.accounts);
+      db.transaction(() => {
+        for (const t of data.added) {
+          upsertTransaction(db, t);
+          result.added++;
+        }
+        for (const t of data.modified) {
+          upsertTransaction(db, t);
+          result.modified++;
+        }
+        for (const r of data.removed) {
+          applyRemoved(db, r);
+          result.removed++;
+        }
+        cursor = data.next_cursor;
+        db.prepare('SELECT 1').get(); // keep transaction non-empty even on empty page
+      })();
+      hasMore = data.has_more;
+    }
+  } catch (err) {
+    // Lost auth (expired consent, revoked login) — flag the item so the dashboard
+    // shows it needs a re-link, then rethrow for the caller's error handling.
+    if (plaidErrorCode(err) === 'ITEM_LOGIN_REQUIRED') {
+      db.prepare("UPDATE items SET status = 'login_required' WHERE id = ?").run(item.id);
+    }
+    throw err;
   }
 
   db.prepare(

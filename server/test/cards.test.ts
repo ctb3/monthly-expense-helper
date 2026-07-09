@@ -3,7 +3,7 @@ import { buildApp, buildDeps } from '../src/index.js';
 import { loadConfig } from '../src/config.js';
 import { openDb } from '../src/db/index.js';
 import { cellStatus, resolveDueDate, monthWindow, addDays, daysInMonth } from '../src/cards.js';
-import { syncLiabilities } from '../src/plaid/sync.js';
+import { syncItem, syncLiabilities } from '../src/plaid/sync.js';
 
 const PASS = 'a-long-enough-passphrase';
 
@@ -267,5 +267,44 @@ describe('syncLiabilities', () => {
     expect(status).toBe('unavailable');
     const item = deps.db.prepare('SELECT liabilities_status FROM items WHERE id = 1').get() as { liabilities_status: string };
     expect(item.liabilities_status).toBe('unavailable');
+  });
+});
+
+describe('syncItem lost-auth detection', () => {
+  function seedItem(deps: ReturnType<typeof testApp>['deps']): number {
+    deps.vault.initialize(PASS);
+    const ct = deps.vault.encrypt('access-token-1');
+    deps.db.prepare(
+      `INSERT INTO items (plaid_item_id, institution_name, access_token_ciphertext) VALUES ('it-1', 'Amex', ?)`,
+    ).run(ct);
+    return 1;
+  }
+
+  it("marks the item login_required when Plaid returns ITEM_LOGIN_REQUIRED", async () => {
+    const { deps } = testApp();
+    const itemId = seedItem(deps);
+    deps.plaid = {
+      transactionsSync: async () => {
+        throw { response: { data: { error_code: 'ITEM_LOGIN_REQUIRED', error_message: 'login required' } } };
+      },
+    } as never;
+
+    await expect(syncItem(deps.db, deps.vault, deps.plaid, itemId)).rejects.toBeDefined();
+    const item = deps.db.prepare('SELECT status FROM items WHERE id = 1').get() as { status: string };
+    expect(item.status).toBe('login_required');
+  });
+
+  it('leaves status active on non-auth errors', async () => {
+    const { deps } = testApp();
+    const itemId = seedItem(deps);
+    deps.plaid = {
+      transactionsSync: async () => {
+        throw { response: { data: { error_code: 'INTERNAL_SERVER_ERROR' } } };
+      },
+    } as never;
+
+    await expect(syncItem(deps.db, deps.vault, deps.plaid, itemId)).rejects.toBeDefined();
+    const item = deps.db.prepare('SELECT status FROM items WHERE id = 1').get() as { status: string };
+    expect(item.status).toBe('active');
   });
 });

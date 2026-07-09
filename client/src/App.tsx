@@ -64,6 +64,8 @@ export function App() {
         onUnlocked={() => {
           setStatus({ ...status, initialized: true, unlocked: true });
           setUnlocked(true);
+          // Monthly workflow starts by pulling fresh data and surfacing any lost auth.
+          void syncAll();
         }}
       />
     );

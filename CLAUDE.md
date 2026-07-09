@@ -36,6 +36,12 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
   approve/review flow (user explicitly removed it — don't reintroduce).
 - `client/src/pages/Dashboard.tsx` — payment grid, default tab. Card-confirmed cells
   (payment or zero balance) are locked; other cells toggle auto ↔ manually-paid on click.
+  Each card row has a connection-health dot (`SyncDot`): green = auth ok, red =
+  `items.status='login_required'`; clicking the red dot launches a Plaid update-mode
+  re-link inline (shared `client/src/components/PlaidLauncher.tsx`, also used by Accounts).
+- Lost auth: `syncItem` catches `ITEM_LOGIN_REQUIRED` and sets `items.status='login_required'`
+  (a successful sync sets it back to `'active'`). Sync All flags dead items automatically;
+  unlock (login) auto-runs Sync All so the dashboard surfaces re-auth needs immediately.
 
 ## Invariants / gotchas
 
