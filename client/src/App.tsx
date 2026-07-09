@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, type StatusResp } from './api';
 import { Unlock } from './pages/Unlock';
+import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Accounts } from './pages/Accounts';
 
-type Tab = 'transactions' | 'accounts';
+type Tab = 'dashboard' | 'transactions' | 'accounts';
 
 export function App() {
   const [status, setStatus] = useState<StatusResp | null>(null);
   const [unlocked, setUnlocked] = useState(false);
-  const [tab, setTab] = useState<Tab>('transactions');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   useEffect(() => {
     api<StatusResp>('/api/status').then((s) => {
@@ -51,7 +52,7 @@ export function App() {
       <header>
         <h1>Expense Helper</h1>
         <nav>
-          {(['transactions', 'accounts'] as Tab[]).map((t) => (
+          {(['dashboard', 'transactions', 'accounts'] as Tab[]).map((t) => (
             <button key={t} className={tab === t ? 'tab active' : 'tab'} onClick={() => setTab(t)}>
               {t[0].toUpperCase() + t.slice(1)}
             </button>
@@ -62,6 +63,7 @@ export function App() {
         </button>
       </header>
       <main>
+        {tab === 'dashboard' && <Dashboard onAuthError={onAuthError} />}
         {tab === 'transactions' && <Transactions onAuthError={onAuthError} />}
         {tab === 'accounts' && <Accounts onAuthError={onAuthError} />}
       </main>

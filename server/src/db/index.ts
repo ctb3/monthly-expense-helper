@@ -71,6 +71,41 @@ const MIGRATIONS: string[] = [
   ALTER TABLE transactions ADD COLUMN ignored INTEGER;
   ALTER TABLE merchant_map ADD COLUMN ignore INTEGER NOT NULL DEFAULT 0;
   `,
+  // v3: credit-card payment dashboard. Liabilities snapshots (from Plaid
+  // /liabilities/get) plus accumulated per-card history and manual overrides.
+  `
+  ALTER TABLE items ADD COLUMN liabilities_status TEXT; -- NULL=never tried, 'ok', 'unavailable'
+
+  CREATE TABLE account_liabilities (
+    account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    next_payment_due_date TEXT,
+    last_payment_date TEXT,
+    last_payment_amount REAL,
+    last_statement_issue_date TEXT,
+    last_statement_balance REAL,
+    minimum_payment_amount REAL,
+    is_overdue INTEGER,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Snapshot APIs only report the latest due/payment, so each sync appends to
+  -- this history; past-month dashboard cells read from it.
+  CREATE TABLE card_events (
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('payment','due')),
+    event_date TEXT NOT NULL, -- YYYY-MM-DD
+    amount REAL,
+    PRIMARY KEY (account_id, kind, event_date)
+  );
+
+  CREATE TABLE card_payment_overrides (
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    month TEXT NOT NULL,      -- 'YYYY-MM'
+    paid INTEGER NOT NULL,    -- 1=force paid, 0=force unpaid
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (account_id, month)
+  );
+  `,
 ];
 
 export type Db = Database.Database;

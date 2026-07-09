@@ -1,6 +1,7 @@
 import type { PlaidApi, Transaction, AccountBase, RemovedTransaction } from 'plaid';
 import type { Db } from '../db/index.js';
 import type { Vault } from '../crypto/vault.js';
+import { errorMessage } from '../redact.js';
 
 export interface SyncResult {
   added: number;
@@ -61,6 +62,96 @@ export async function syncItem(
     "UPDATE items SET cursor = ?, last_synced_at = datetime('now'), status = 'active' WHERE id = ?",
   ).run(cursor ?? null, item.id);
   return result;
+}
+
+/**
+ * Fetch credit-card liabilities (due dates, last payment) for an item and cache
+ * them. Snapshot API, so we also append to card_events for dashboard history.
+ * Never throws: the Liabilities product may be unavailable (free trial, missing
+ * consent) — on any failure we mark the item 'unavailable' and move on, so the
+ * transaction sync it runs alongside is never affected.
+ */
+export async function syncLiabilities(
+  db: Db,
+  vault: Vault,
+  plaid: PlaidApi,
+  itemId: number,
+): Promise<'ok' | 'unavailable'> {
+  const item = db
+    .prepare('SELECT access_token_ciphertext FROM items WHERE id = ?')
+    .get(itemId) as { access_token_ciphertext: string } | undefined;
+  if (!item) throw new Error(`item ${itemId} not found`);
+
+  try {
+    const resp = await plaid.liabilitiesGet({
+      access_token: vault.decrypt(item.access_token_ciphertext),
+    });
+    const credits = resp.data.liabilities.credit ?? [];
+    db.transaction(() => {
+      for (const c of credits) {
+        if (!c.account_id) continue;
+        const acct = db
+          .prepare('SELECT id FROM accounts WHERE plaid_account_id = ?')
+          .get(c.account_id) as { id: number } | undefined;
+        if (!acct) continue;
+        upsertLiability(db, acct.id, c);
+      }
+    })();
+    db.prepare("UPDATE items SET liabilities_status = 'ok' WHERE id = ?").run(itemId);
+    return 'ok';
+  } catch (err) {
+    // errorMessage() redacts tokens; never log the raw error object.
+    db.prepare("UPDATE items SET liabilities_status = 'unavailable' WHERE id = ?").run(itemId);
+    // eslint-disable-next-line no-console
+    console.warn(`liabilities unavailable for item ${itemId}: ${errorMessage(err)}`);
+    return 'unavailable';
+  }
+}
+
+interface CreditLiability {
+  next_payment_due_date: string | null;
+  last_payment_date: string | null;
+  last_payment_amount: number | null;
+  last_statement_issue_date: string | null;
+  last_statement_balance: number | null;
+  minimum_payment_amount: number | null;
+  is_overdue: boolean | null;
+}
+
+function upsertLiability(db: Db, accountId: number, c: CreditLiability): void {
+  db.prepare(`
+    INSERT INTO account_liabilities (
+      account_id, next_payment_due_date, last_payment_date, last_payment_amount,
+      last_statement_issue_date, last_statement_balance, minimum_payment_amount,
+      is_overdue, fetched_at
+    ) VALUES (@account_id, @next_due, @last_pay_date, @last_pay_amt,
+      @last_stmt_date, @last_stmt_bal, @min_pay, @is_overdue, datetime('now'))
+    ON CONFLICT(account_id) DO UPDATE SET
+      next_payment_due_date = excluded.next_payment_due_date,
+      last_payment_date = excluded.last_payment_date,
+      last_payment_amount = excluded.last_payment_amount,
+      last_statement_issue_date = excluded.last_statement_issue_date,
+      last_statement_balance = excluded.last_statement_balance,
+      minimum_payment_amount = excluded.minimum_payment_amount,
+      is_overdue = excluded.is_overdue,
+      fetched_at = datetime('now')
+  `).run({
+    account_id: accountId,
+    next_due: c.next_payment_due_date ?? null,
+    last_pay_date: c.last_payment_date ?? null,
+    last_pay_amt: c.last_payment_amount ?? null,
+    last_stmt_date: c.last_statement_issue_date ?? null,
+    last_stmt_bal: c.last_statement_balance ?? null,
+    min_pay: c.minimum_payment_amount ?? null,
+    is_overdue: c.is_overdue === null || c.is_overdue === undefined ? null : c.is_overdue ? 1 : 0,
+  });
+
+  // Accumulate history: snapshots only report the latest due/payment.
+  const addEvent = db.prepare(`
+    INSERT OR IGNORE INTO card_events (account_id, kind, event_date, amount) VALUES (?, ?, ?, ?)
+  `);
+  if (c.last_payment_date) addEvent.run(accountId, 'payment', c.last_payment_date, c.last_payment_amount ?? null);
+  if (c.next_payment_due_date) addEvent.run(accountId, 'due', c.next_payment_due_date, c.last_statement_balance ?? null);
 }
 
 function upsertAccounts(db: Db, itemId: number, institutionName: string, accounts: AccountBase[]): void {

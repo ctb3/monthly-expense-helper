@@ -14,6 +14,7 @@ import type { AppDeps } from './deps.js';
 import { authRoutes } from './routes/auth.js';
 import { plaidRoutes } from './routes/plaid.js';
 import { transactionRoutes } from './routes/transactions.js';
+import { cardRoutes } from './routes/cards.js';
 import { exportRoutes } from './routes/export.js';
 import { importRoutes } from './routes/import.js';
 
@@ -42,6 +43,7 @@ export function buildApp(deps: AppDeps) {
   authRoutes(app, deps);
   plaidRoutes(app, deps);
   transactionRoutes(app, deps);
+  cardRoutes(app, deps);
   exportRoutes(app, deps);
   importRoutes(app, deps);
 

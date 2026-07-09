@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { CountryCode, Products } from 'plaid';
 import type { AppDeps } from '../deps.js';
-import { syncItem } from '../plaid/sync.js';
+import { syncItem, syncLiabilities } from '../plaid/sync.js';
 import { errorMessage } from '../redact.js';
 
 export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
@@ -21,12 +21,18 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
       const resp = itemId
         ? await plaid.linkTokenCreate({
             ...base,
-            // Update mode: re-authenticate an existing item.
+            // Update mode: re-authenticate an existing item. Ask for liabilities
+            // consent too, so re-linking an existing card grants the dashboard's
+            // due-date data without adding a required product.
             access_token: vault.decrypt(getItemTokenCiphertext(deps, itemId)),
+            additional_consented_products: [Products.Liabilities],
           })
         : await plaid.linkTokenCreate({
             ...base,
             products: [Products.Transactions],
+            // Optional (not required): institutions lacking liabilities support
+            // still link; cards that have it feed the payment dashboard.
+            optional_products: [Products.Liabilities],
             transactions: { days_requested: 730 },
           });
       return { link_token: resp.data.link_token };
@@ -52,7 +58,8 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
         .run(resp.data.item_id, institution_name || 'unknown', ciphertext);
       const itemId = Number(info.lastInsertRowid);
       const sync = await syncItem(db, vault, plaid, itemId);
-      return { item_id: itemId, sync };
+      const liabilities = await syncLiabilities(db, vault, plaid, itemId);
+      return { item_id: itemId, sync: { ...sync, liabilities } };
     } catch (err) {
       req.log.error(`token exchange failed: ${errorMessage(err)}`);
       return reply.code(502).send({ error: errorMessage(err) });
@@ -74,7 +81,9 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
   app.post('/api/items/:id/sync', async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     try {
-      return await syncItem(db, vault, plaid, id);
+      const sync = await syncItem(db, vault, plaid, id);
+      const liabilities = await syncLiabilities(db, vault, plaid, id);
+      return { ...sync, liabilities };
     } catch (err) {
       req.log.error(`sync failed for item ${id}: ${errorMessage(err)}`);
       return reply.code(502).send({ error: errorMessage(err) });

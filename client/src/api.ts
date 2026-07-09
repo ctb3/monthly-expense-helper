@@ -85,3 +85,38 @@ export interface StatusResp {
   initialized: boolean;
   unlocked: boolean;
 }
+
+export type CellStatus = 'paid' | 'due-soon' | 'late' | 'upcoming' | 'unknown';
+
+export interface CardCell {
+  month: string; // 'YYYY-MM'
+  due_date: string | null; // 'YYYY-MM-DD'
+  status: CellStatus;
+  paid_by: 'override' | 'liability' | 'no-balance' | null;
+  payment: { date: string; amount: number | null } | null;
+}
+
+export interface CardRow {
+  account_id: number;
+  name: string;
+  mask: string | null;
+  source_label: string;
+  item_id: number;
+  institution_name: string;
+  item_status: string;
+  last_synced_at: string | null;
+  liabilities_status: 'ok' | 'unavailable' | null;
+  liabilities: {
+    next_payment_due_date: string | null;
+    minimum_payment_amount: number | null;
+    last_statement_balance: number | null;
+    is_overdue: number | null;
+    fetched_at: string;
+  } | null;
+  cells: CardCell[];
+}
+
+export interface CardsDashboard {
+  months: string[]; // 'YYYY-MM'
+  cards: CardRow[];
+}
