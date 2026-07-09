@@ -79,6 +79,45 @@ describe('suggest / learn', () => {
     ).toMatchObject({ ignore: true });
   });
 
+  it('fuzzy-matches a clean brand to longer seed descriptors', () => {
+    const fdb = openDb(':memory:');
+    // Seed rows as history import writes them: full statement descriptors.
+    fdb
+      .prepare(
+        "INSERT INTO merchant_map (merchant_key, category, subcategory, ignore, hits) VALUES (?, ?, ?, 0, ?)",
+      )
+      .run('PATREON MEMBERSHIP SAN FRANCISCO CA', 'Luxury', 'Streaming', 10);
+    // Live txn gives the clean brand only; no PFC mapping for it.
+    const s = suggest(fdb, {
+      merchant_name: 'Patreon',
+      name: 'Patreon* Membership',
+      pfc_detailed: 'ENTERTAINMENT_OTHER_ENTERTAINMENT',
+      pfc_primary: 'ENTERTAINMENT',
+    });
+    expect(s).toEqual({
+      category: 'Luxury',
+      subcategory: 'Streaming',
+      confidence: 'high',
+      source: 'memory',
+    });
+  });
+
+  it('does not fuzzy-match a too-short generic token', () => {
+    const fdb = openDb(':memory:');
+    fdb
+      .prepare(
+        "INSERT INTO merchant_map (merchant_key, category, subcategory, ignore, hits) VALUES (?, ?, ?, 0, ?)",
+      )
+      .run('CVS PHARMACY ANN ARBOR MI', 'Health', 'Medicine', 5);
+    const s = suggest(fdb, {
+      merchant_name: 'CVS',
+      name: 'CVS',
+      pfc_detailed: null,
+      pfc_primary: null,
+    });
+    expect(s).toBeNull();
+  });
+
   it('user hide decision beats everything; unhide restores fallback', () => {
     const txn = {
       merchant_name: 'Netflix',

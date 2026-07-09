@@ -96,6 +96,38 @@ const IGNORE_SUGGESTION = (source: 'memory' | 'plaid', confidence: 'high' | 'low
   ignore: true,
 });
 
+/**
+ * Fuzzy memory match for when the exact key misses. Seed data holds full
+ * statement descriptors ("PATREON MEMBERSHIP SAN FRANCISCO CA") while live Plaid
+ * txns often give a clean brand ("PATREON"); either can be a leading-token prefix
+ * of the other. Match on that word boundary, then let the highest-hit
+ * category/subcategory pair win. Ignore-flagged rows aren't considered here (hide
+ * decisions are learned from live keys, so they exact-match above).
+ */
+function fuzzyMemoryMatch(db: Db, key: string): Suggestion | null {
+  // Single short token (e.g. "CVS") is too generic to prefix-match safely.
+  if (key.length < 4) return null;
+  const rows = db
+    .prepare(
+      `SELECT category, subcategory, hits FROM merchant_map
+       WHERE category <> '' AND ignore = 0
+         AND (merchant_key LIKE @prefix OR @key LIKE (merchant_key || ' %'))`,
+    )
+    .all({ key, prefix: key + ' %' }) as { category: string; subcategory: string; hits: number }[];
+  if (!rows.length) return null;
+  const byPair = new Map<string, { category: string; subcategory: string; hits: number }>();
+  for (const r of rows) {
+    const pair = `${r.category}|${r.subcategory}`;
+    const acc = byPair.get(pair);
+    if (acc) acc.hits += r.hits;
+    else byPair.set(pair, { ...r });
+  }
+  let best: { category: string; subcategory: string; hits: number } | null = null;
+  for (const v of byPair.values()) if (!best || v.hits > best.hits) best = v;
+  if (!best) return null;
+  return { category: best.category, subcategory: best.subcategory, confidence: 'high', source: 'memory' };
+}
+
 export function suggest(db: Db, t: TxnForSuggestion): Suggestion | null {
   const key = merchantKeyFor(t);
   if (key) {
@@ -111,6 +143,8 @@ export function suggest(db: Db, t: TxnForSuggestion): Suggestion | null {
         source: 'memory',
       };
     }
+    const fuzzy = fuzzyMemoryMatch(db, key);
+    if (fuzzy) return fuzzy;
   }
   if (
     (t.pfc_detailed && IGNORE_PFC.has(t.pfc_detailed)) ||
