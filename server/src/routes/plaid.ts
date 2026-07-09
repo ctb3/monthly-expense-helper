@@ -93,6 +93,22 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
     return { ok: true };
   });
 
+  app.post('/api/items/sync-all', async (req, reply) => {
+    const ids = (db.prepare('SELECT id FROM items').all() as Array<{ id: number }>).map((r) => r.id);
+    const results: Array<{ id: number; added?: number; error?: string }> = [];
+    for (const id of ids) {
+      try {
+        const sync = await syncItem(db, vault, plaid, id);
+        await syncLiabilities(db, vault, plaid, id);
+        results.push({ id, added: sync.added });
+      } catch (err) {
+        req.log.error(`sync-all failed for item ${id}: ${errorMessage(err)}`);
+        results.push({ id, error: errorMessage(err) });
+      }
+    }
+    return { results };
+  });
+
   app.post('/api/items/:id/sync', async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     try {

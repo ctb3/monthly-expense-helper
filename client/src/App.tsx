@@ -11,6 +11,9 @@ export function App() {
   const [status, setStatus] = useState<StatusResp | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     api<StatusResp>('/api/status').then((s) => {
@@ -31,6 +34,25 @@ export function App() {
   const lock = async () => {
     await api('/api/lock', { method: 'POST' }).catch(() => undefined);
     setUnlocked(false);
+  };
+
+  const syncAll = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const resp = await api<{ results: Array<{ id: number; added?: number; error?: string }> }>(
+        '/api/items/sync-all',
+        { method: 'POST' },
+      );
+      const failed = resp.results.filter((r) => r.error).length;
+      const added = resp.results.reduce((sum, r) => sum + (r.added ?? 0), 0);
+      setSyncMsg(failed ? `Synced with ${failed} error(s), ${added} added.` : `Synced ${added} new transactions.`);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      if (!onAuthError(err)) setSyncMsg('Sync failed.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   if (!status) return <div className="center-note">Loading…</div>;
@@ -58,14 +80,18 @@ export function App() {
             </button>
           ))}
         </nav>
+        {syncMsg && <span className="info">{syncMsg}</span>}
+        <button disabled={syncing} onClick={syncAll} title="Sync all linked institutions">
+          {syncing ? 'Syncing…' : 'Sync All'}
+        </button>
         <button className="lock" onClick={lock} title="Lock the vault">
           Lock
         </button>
       </header>
       <main>
-        {tab === 'dashboard' && <Dashboard onAuthError={onAuthError} />}
-        {tab === 'transactions' && <Transactions onAuthError={onAuthError} />}
-        {tab === 'accounts' && <Accounts onAuthError={onAuthError} />}
+        {tab === 'dashboard' && <Dashboard key={refreshKey} onAuthError={onAuthError} />}
+        {tab === 'transactions' && <Transactions key={refreshKey} onAuthError={onAuthError} />}
+        {tab === 'accounts' && <Accounts key={refreshKey} onAuthError={onAuthError} />}
       </main>
     </div>
   );
