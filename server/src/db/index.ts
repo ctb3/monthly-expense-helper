@@ -106,6 +106,12 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (account_id, month)
   );
   `,
+  // v4: user-defined institution ordering. Drives Transactions/export/dashboard
+  // row order (was alphabetical by source_label). Backfill existing by id.
+  `
+  ALTER TABLE items ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+  UPDATE items SET sort_order = id;
+  `,
 ];
 
 export type Db = Database.Database;

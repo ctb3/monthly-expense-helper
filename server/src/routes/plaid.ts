@@ -53,7 +53,8 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
       const ciphertext = vault.encrypt(resp.data.access_token);
       const info = db
         .prepare(
-          'INSERT INTO items (plaid_item_id, institution_name, access_token_ciphertext) VALUES (?, ?, ?)',
+          `INSERT INTO items (plaid_item_id, institution_name, access_token_ciphertext, sort_order)
+           VALUES (?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM items))`,
         )
         .run(resp.data.item_id, institution_name || 'unknown', ciphertext);
       const itemId = Number(info.lastInsertRowid);
@@ -69,13 +70,27 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
   app.get('/api/items', async () => {
     const items = db
       .prepare(
-        'SELECT id, institution_name, status, last_synced_at, created_at FROM items ORDER BY id',
+        'SELECT id, institution_name, status, last_synced_at, created_at, sort_order FROM items ORDER BY sort_order, id',
       )
       .all() as Array<Record<string, unknown> & { id: number }>;
     const accounts = db
       .prepare('SELECT id, item_id, name, official_name, mask, type, subtype, source_label FROM accounts')
       .all() as Array<{ item_id: number }>;
     return items.map((it) => ({ ...it, accounts: accounts.filter((a) => a.item_id === it.id) }));
+  });
+
+  // Persist a user-chosen institution order. Body: { order: itemId[] }.
+  // sort_order is assigned by array position; ids not listed keep their value.
+  app.post('/api/items/reorder', async (req, reply) => {
+    const { order } = (req.body ?? {}) as { order?: unknown };
+    if (!Array.isArray(order) || !order.every((x) => Number.isInteger(x))) {
+      return reply.code(400).send({ error: 'order must be an array of item ids' });
+    }
+    const update = db.prepare('UPDATE items SET sort_order = ? WHERE id = ?');
+    db.transaction(() => {
+      (order as number[]).forEach((id, i) => update.run(i, id));
+    })();
+    return { ok: true };
   });
 
   app.post('/api/items/:id/sync', async (req, reply) => {

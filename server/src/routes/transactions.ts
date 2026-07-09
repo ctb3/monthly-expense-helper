@@ -22,9 +22,11 @@ interface TxnRow extends TxnForSuggestion {
 
 const LIST_SQL = `
   SELECT t.*, a.source_label, a.name AS account_name, a.mask
-  FROM transactions t JOIN accounts a ON a.id = t.account_id
+  FROM transactions t
+  JOIN accounts a ON a.id = t.account_id
+  JOIN items i ON i.id = a.item_id
   WHERE t.date >= ? AND t.date <= ?
-  ORDER BY a.source_label, t.date, t.id
+  ORDER BY i.sort_order, a.source_label, t.date, t.id
 `;
 
 export function transactionRoutes(app: FastifyInstance, deps: AppDeps): void {

@@ -69,6 +69,8 @@ input.note { width: 100%; min-width: 14rem; }
 
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 1rem; }
 .card-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.6rem; }
+.reorder { display: flex; gap: 0.2rem; }
+.reorder .chip { padding: 0.15rem 0.5rem; line-height: 1; }
 .spacer { flex: 1; }
 .muted { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
 .info { color: var(--ok); }

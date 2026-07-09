@@ -6,11 +6,13 @@ import { toDelimited, type ExportFormat, type ExportRow } from '../export.js';
 const EXPORT_SQL = `
   SELECT t.date, t.amount, t.category, t.subcategory, t.note, t.name, t.merchant_name,
          t.pfc_primary, t.pfc_detailed, t.ignored, a.source_label
-  FROM transactions t JOIN accounts a ON a.id = t.account_id
+  FROM transactions t
+  JOIN accounts a ON a.id = t.account_id
+  JOIN items i ON i.id = a.item_id
   WHERE t.date >= @start AND t.date <= @end
     AND t.removed = 0
     AND (@account_id IS NULL OR t.account_id = @account_id)
-  ORDER BY a.source_label, t.date, t.id
+  ORDER BY i.sort_order, a.source_label, t.date, t.id
 `;
 
 interface ExportQueryRow {

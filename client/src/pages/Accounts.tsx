@@ -83,6 +83,22 @@ export function Accounts({ onAuthError }: PageProps) {
     }
   };
 
+  // Swap card with its neighbour, persist the new institution order. Optimistic:
+  // reflect locally, then POST; drives Transactions/export/dashboard row order.
+  const move = async (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    setItems(next);
+    try {
+      await api('/api/items/reorder', { method: 'POST', body: { order: next.map((i) => i.id) } });
+    } catch (err) {
+      if (!onAuthError(err)) setError(err instanceof Error ? err.message : String(err));
+      await load();
+    }
+  };
+
   const remove = async (item: Item) => {
     if (
       !window.confirm(
@@ -115,9 +131,27 @@ export function Accounts({ onAuthError }: PageProps) {
         </p>
       )}
       <HistoryImport onAuthError={onAuthError} />
-      {items.map((item) => (
+      {items.map((item, index) => (
         <div className="card" key={item.id}>
           <div className="card-head">
+            <div className="reorder">
+              <button
+                className="chip"
+                disabled={busy || index === 0}
+                onClick={() => move(index, -1)}
+                title="Move up"
+              >
+                ↑
+              </button>
+              <button
+                className="chip"
+                disabled={busy || index === items.length - 1}
+                onClick={() => move(index, 1)}
+                title="Move down"
+              >
+                ↓
+              </button>
+            </div>
             <strong>{item.institution_name}</strong>
             <span className="muted">
               {item.last_synced_at ? `last synced ${item.last_synced_at} UTC` : 'never synced'}

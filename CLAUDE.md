@@ -55,6 +55,9 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
   browser can't reach it.
 - Suggestions are computed live on GET; only user-picked categories persist. Table and
   export always agree by construction.
+- Row order in Transactions/export/dashboard = `items.sort_order` then `source_label`
+  (was alphabetical). User reorders institution cards on Accounts (`↑/↓` →
+  `POST /api/items/reorder`). Multi-account institutions stay grouped (share item order).
 - Dashboard liabilities key off `last_statement_balance` (a balance ≤ 0 = settled,
   shown green): Plaid sandbox reports `minimum_payment_amount = 0` for every card, so
   that field is useless as a "nothing owed" signal. Link token requests Liabilities as

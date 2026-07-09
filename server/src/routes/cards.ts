@@ -45,7 +45,7 @@ const CARDS_SQL = `
          i.last_synced_at, i.liabilities_status
   FROM accounts a JOIN items i ON i.id = a.item_id
   WHERE a.type = 'credit'
-  ORDER BY a.source_label, a.id
+  ORDER BY i.sort_order, a.source_label, a.id
 `;
 
 export function cardRoutes(app: FastifyInstance, deps: AppDeps): void {

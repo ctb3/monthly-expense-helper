@@ -78,6 +78,7 @@ export interface Item {
   status: string;
   last_synced_at: string | null;
   created_at: string;
+  sort_order: number;
   accounts: Account[];
 }
 
