@@ -54,6 +54,9 @@ export function authRoutes(app: FastifyInstance, deps: AppDeps): void {
       failedAttempts = 0;
     }
 
+    // Surface a pending app update by the time the user looks at the header.
+    void deps.update.checkIfStale();
+
     const token = sessions.create();
     reply.setCookie('session', token, {
       httpOnly: true,

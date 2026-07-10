@@ -34,6 +34,30 @@ npm run dev            # server :8080, client :5173 (proxied)
   (Amex included) authenticate in a browser popup — no redirect URI setup needed on
   desktop web. Amex consent expires yearly; use Re-link when sync starts failing.
 
+## Deployment (Proxmox LXC + Docker)
+
+Production runs the CI-built image from GHCR with a watchtower sidecar; updating to a
+new version is one click inside the app. Full walkthrough in `docs/deploy-proxmox.md`;
+the short version:
+
+```bash
+# Debian LXC (unprivileged, features: nesting=1) with docker + compose plugin
+mkdir expense-helper && cd expense-helper
+# copy docker-compose.prod.yml and .env.example here
+cp .env.example .env && chmod 600 .env
+# edit .env: Plaid production keys, GHCR_TOKEN (read:packages PAT),
+#            WATCHTOWER_TOKEN=$(openssl rand -hex 32)
+docker login ghcr.io -u ctb3        # password = the same PAT
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Open `http://<host>:8080`, set the vault passphrase. Every push to `main` publishes a
+new image (`.github/workflows/publish.yml`); the app header then shows **Install
+update** — one click pulls the image and restarts the container (it comes back locked;
+unlock as usual). Changes to `.env` or the compose file still need a manual
+`docker compose -f docker-compose.prod.yml up -d`. Back up the LXC (or the
+`expense-data` volume) with Proxmox's normal backup job.
+
 ## Commands
 
 | Command | What |
@@ -41,7 +65,8 @@ npm run dev            # server :8080, client :5173 (proxied)
 | `npm run dev` | Server (tsx watch) + Vite client with API proxy |
 | `npm test` | Server unit + API tests (vitest) |
 | `npm run build` | Typecheck + build both workspaces |
-| `docker compose up -d --build` | Production container (see `docs/deploy-proxmox.md`) |
+| `docker compose up -d --build` | Local production container (build-on-box; in-app updater disabled) |
+| `docker compose -f docker-compose.prod.yml up -d` | Deployment: GHCR image + watchtower (see `docs/deploy-proxmox.md`) |
 
 ## Layout
 

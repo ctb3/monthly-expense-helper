@@ -42,6 +42,16 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
 - Lost auth: `syncItem` catches `ITEM_LOGIN_REQUIRED` and sets `items.status='login_required'`
   (a successful sync sets it back to `'active'`). Sync All flags dead items automatically;
   unlock (login) auto-runs Sync All so the dashboard surfaces re-auth needs immediately.
+- Self-update: CI (`.github/workflows/publish.yml`) pushes `ghcr.io/ctb3/monthly-expense-helper`
+  (`:latest` + `:sha-<sha>`, provenance off so `:latest` is a plain manifest) with the full
+  git SHA baked in (`ENV GIT_SHA` + revision label). `server/src/update.ts` `UpdateChecker`
+  compares own SHA to the remote `:latest` revision label via GHCR registry API (checks on
+  unlock, 6h interval started only in `isMain`, manual `POST /api/update/check`); header
+  `UpdateButton` (client) installs via the watchtower sidecar's HTTP API
+  (`docker-compose.prod.yml`; dev compose unchanged). Feature self-disables unless
+  `GHCR_TOKEN` + real `GIT_SHA` (+ `WATCHTOWER_TOKEN` for apply) are set — dev/tests see
+  `enabled:false`. Apply response is expected to be lost (watchtower kills the container
+  mid-request): server races a 5s timer, client polls `/api/status` down→up then reloads.
 
 ## Invariants / gotchas
 

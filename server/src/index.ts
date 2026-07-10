@@ -17,6 +17,8 @@ import { transactionRoutes } from './routes/transactions.js';
 import { cardRoutes } from './routes/cards.js';
 import { exportRoutes } from './routes/export.js';
 import { importRoutes } from './routes/import.js';
+import { updateRoutes } from './routes/update.js';
+import { UpdateChecker } from './update.js';
 
 const PUBLIC_API = new Set(['/api/status', '/api/unlock']);
 
@@ -46,6 +48,7 @@ export function buildApp(deps: AppDeps) {
   cardRoutes(app, deps);
   exportRoutes(app, deps);
   importRoutes(app, deps);
+  updateRoutes(app, deps);
 
   // Serve the built client in production.
   const clientDist =
@@ -71,6 +74,7 @@ export function buildDeps(config: Config, db?: Db): AppDeps {
     vault: new Vault(),
     sessions: new Sessions(config.sessionTtlMs),
     plaid: makePlaidClient(config),
+    update: new UpdateChecker(config.update),
   };
 }
 
@@ -89,7 +93,9 @@ if (isMain) {
     // eslint-disable-next-line no-console
     console.warn('PLAID_CLIENT_ID / PLAID_SECRET not set - Plaid routes will fail until configured');
   }
-  const app = buildApp(buildDeps(config));
+  const deps = buildDeps(config);
+  deps.update.startAutoCheck();
+  const app = buildApp(deps);
   app.listen({ port: config.port, host: config.host }).catch((err) => {
     app.log.error(err);
     process.exit(1);

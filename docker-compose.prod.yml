@@ -1,0 +1,47 @@
+# Production deployment (Debian LXC on Proxmox): pulls the CI-built image from
+# GHCR instead of building locally, plus a watchtower sidecar that the app's
+# in-app "Install update" button drives via HTTP API.
+#
+# Host prep (once):
+#   docker login ghcr.io -u ctb3 -p <classic PAT with read:packages>
+#   fill GHCR_TOKEN / WATCHTOWER_TOKEN (and optionally IMAGE_REF) in .env
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Config changes (.env / this file) still need a manual `up -d` — watchtower
+# recreates the container with its existing config only.
+services:
+  app:
+    image: ghcr.io/ctb3/monthly-expense-helper:latest
+    ports:
+      # LAN-only by design: bind to the host's LAN address or use a firewall;
+      # nothing here should ever be exposed to the internet.
+      - "8080:8080"
+    env_file: .env
+    environment:
+      DB_PATH: /data/expense.db
+    volumes:
+      - expense-data:/data
+    restart: unless-stopped
+    labels:
+      # Exact spelling "centurylinklabs" — a typo means watchtower silently
+      # never updates this container.
+      - com.centurylinklabs.watchtower.enable=true
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    environment:
+      WATCHTOWER_HTTP_API_UPDATE: "true"
+      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_TOKEN}
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      # HTTP-API mode disables periodic polling by default; updates happen
+      # only when the app asks. Do not set WATCHTOWER_HTTP_API_PERIODIC_POLLS.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json:ro # GHCR pull auth from `docker login`
+    # No ports: the API is reachable only inside the compose network
+    # at http://watchtower:8080.
+
+volumes:
+  expense-data:

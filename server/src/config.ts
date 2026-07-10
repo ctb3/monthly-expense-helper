@@ -11,6 +11,13 @@ export interface Config {
     secret: string;
     env: PlaidEnvName;
   };
+  update: {
+    imageRef: string;
+    ghcrToken: string;
+    watchtowerUrl: string;
+    watchtowerToken: string;
+    currentSha: string;
+  };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -25,6 +32,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       clientId: env.PLAID_CLIENT_ID ?? '',
       secret: env.PLAID_SECRET ?? '',
       env: plaidEnv,
+    },
+    update: {
+      imageRef: env.IMAGE_REF ?? 'ghcr.io/ctb3/monthly-expense-helper:latest',
+      ghcrToken: env.GHCR_TOKEN ?? '',
+      watchtowerUrl: env.WATCHTOWER_URL ?? 'http://watchtower:8080',
+      watchtowerToken: env.WATCHTOWER_TOKEN ?? '',
+      currentSha: env.GIT_SHA ?? '',
     },
   };
 }

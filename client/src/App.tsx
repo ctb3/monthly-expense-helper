@@ -4,6 +4,7 @@ import { Unlock } from './pages/Unlock';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Accounts } from './pages/Accounts';
+import { UpdateButton } from './components/UpdateButton';
 
 type Tab = 'dashboard' | 'transactions' | 'accounts';
 
@@ -86,6 +87,7 @@ export function App() {
         <button disabled={syncing} onClick={syncAll} title="Sync all linked institutions">
           {syncing ? 'Syncing…' : 'Sync All'}
         </button>
+        <UpdateButton onAuthError={onAuthError} />
         <button className="lock" onClick={lock} title="Lock the vault">
           Lock
         </button>

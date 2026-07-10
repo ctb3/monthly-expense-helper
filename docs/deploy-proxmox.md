@@ -11,15 +11,26 @@ avoids that entirely and is the lower-friction choice.
 
 ## Install
 
+Production pulls the CI-built image from GHCR (`.github/workflows/publish.yml` pushes
+on every push to main) instead of building on the box:
+
 ```bash
-git clone <your repo> expense-helper && cd expense-helper
+mkdir expense-helper && cd expense-helper
+# fetch docker-compose.prod.yml + .env.example from the repo (or clone it)
 cp .env.example .env
 chmod 600 .env
-# edit .env: PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV=production
-docker compose up -d --build
+# edit .env: PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV=production,
+#            GHCR_TOKEN (classic PAT, read:packages only),
+#            WATCHTOWER_TOKEN (openssl rand -hex 32)
+docker login ghcr.io -u ctb3   # password = the same PAT; watchtower reuses this auth
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 Open `http://<vm-ip>:8080`, set the vault passphrase on first run.
+
+(`docker compose up -d --build` with the dev `docker-compose.yml` still works for a
+build-on-box install, but the in-app updater stays disabled there — the local image
+has `GIT_SHA=dev` and watchtower can only pull registry images.)
 
 ## Security posture
 
@@ -37,7 +48,14 @@ Open `http://<vm-ip>:8080`, set the vault passphrase on first run.
   /backup/expense-backup.tgz /data`. Backups are safe to store as-is — tokens in them
   are useless without the passphrase — but treat them as sensitive anyway (transaction
   history is in plaintext).
-- **Updates**: `git pull && docker compose up -d --build`.
+- **Updates**: push to main → CI publishes `ghcr.io/ctb3/monthly-expense-helper:latest`
+  → the app's header shows **Install update** (it checks the registry on unlock, every
+  6 h, and via **Check for updates**) → one click has the watchtower sidecar pull the
+  image and recreate the container. The app comes back locked; unlock as usual.
+  - Manual fallback: `docker compose -f docker-compose.prod.yml pull && docker compose
+    -f docker-compose.prod.yml up -d`.
+  - `.env`/compose changes are **not** picked up by watchtower — run `up -d` manually.
+  - Rollback: point `image:` (or `IMAGE_REF`) at a `:sha-<full-sha>` tag and `up -d`.
 
 ## Amex / OAuth institutions
 

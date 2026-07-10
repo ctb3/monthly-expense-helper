@@ -87,6 +87,16 @@ export interface StatusResp {
   unlocked: boolean;
 }
 
+export interface UpdateStatusResp {
+  enabled: boolean;
+  applyEnabled: boolean;
+  currentSha: string | null;
+  remoteSha: string | null;
+  updateAvailable: boolean;
+  checkedAt: string | null;
+  error: string | null;
+}
+
 export type CellStatus = 'paid' | 'due-soon' | 'late' | 'upcoming' | 'unknown';
 
 export interface CardCell {
