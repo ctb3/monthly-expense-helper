@@ -53,10 +53,11 @@ https://docs.docker.com/engine/install/debian/ — same result.)
 ```bash
 mkdir -p /opt/expense-helper && cd /opt/expense-helper
 
-# Get the two deploy files from the repo — scp from a machine with a checkout,
-# or download raw from GitHub:
-#   docker-compose.prod.yml
-#   .env.example
+# Only two files are needed on the host (the app itself ships in the image):
+base=https://raw.githubusercontent.com/ctb3/monthly-expense-helper/main
+curl -fsSLO $base/docker-compose.prod.yml
+curl -fsSLO $base/.env.example
+
 cp .env.example .env
 chmod 600 .env
 ```
