@@ -121,8 +121,8 @@ export function Accounts({ onAuthError }: PageProps) {
       {launch && <PlaidLauncher launch={launch} onDone={finishLink} />}
       {items.length === 0 && (
         <p className="center-note">
-          No institutions linked yet. Start with Amex — each link uses one of your 10 Plaid
-          free-trial connections (sandbox links are free).
+          No institutions linked yet. Each production link uses one of your Plaid
+          connections (sandbox links are free).
         </p>
       )}
       <HistoryImport onAuthError={onAuthError} />

@@ -14,14 +14,15 @@ The docker socket is mounted only into watchtower, never into the app.
 1. **Image exists**: any push to `main` publishes
    `ghcr.io/ctb3/monthly-expense-helper:latest` + `:sha-<full-sha>`. Check under
    GitHub profile → Packages after the first CI run.
-2. **Package must be private**: Packages → `monthly-expense-helper` → Package
-   settings → visibility Private (first push usually inherits repo visibility —
-   verify anyway).
-3. **Pull token**: GitHub → Settings → Developer settings → Personal access tokens →
-   **Tokens (classic)** → Generate. Scope: **only `read:packages`**. Must be a
-   classic token — fine-grained PATs cannot authenticate to GHCR. Note the expiry:
-   when it lapses, the in-app update check starts reporting
-   `registry auth failed (401)` — that's the renewal reminder.
+2. **Package is public** (repo and image contain no secrets; the DB and `.env` never
+   enter the image): Packages → `monthly-expense-helper` → Package settings →
+   visibility Public. Public means anonymous pulls — no PAT, no `docker login`, and
+   the in-app checker exchanges tokens anonymously. If you ever make it private
+   again, create a **classic** PAT with only `read:packages` (fine-grained PATs
+   can't authenticate to GHCR), set it as `GHCR_TOKEN` in `.env`,
+   `docker login ghcr.io` on the host, and give watchtower the credentials by
+   adding `- /root/.docker/config.json:/config.json:ro` to its `volumes:` in
+   `docker-compose.prod.yml`.
 
 ## 2. Create the LXC (Proxmox 9.x)
 
@@ -66,16 +67,10 @@ Edit `.env`:
 | --- | --- |
 | `PLAID_CLIENT_ID` / `PLAID_SECRET` | from the Plaid dashboard (Developers → Keys) |
 | `PLAID_ENV` | `production` |
-| `GHCR_TOKEN` | the classic PAT from §1.3 |
 | `WATCHTOWER_TOKEN` | `openssl rand -hex 32` |
 | `IMAGE_REF`, `WATCHTOWER_URL` | leave at defaults (or delete — defaults are built in) |
 
-Authenticate Docker for private pulls (watchtower reuses the resulting
-`/root/.docker/config.json`, which the compose file mounts into it):
-
-```bash
-docker login ghcr.io -u ctb3     # password prompt: paste the same PAT
-```
+No registry auth needed — the package is public (see §1.2 if you re-privatize it).
 
 ## 5. First start
 
@@ -133,8 +128,8 @@ Exceptions:
 - **Stuck/failed update**: `docker logs $(docker ps -qf name=watchtower)` shows the
   pull/recreate attempt. Manual fallback always works:
   `docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d`
-- **Update button missing**: the feature self-disables when `GHCR_TOKEN` is unset
-  or the image was built locally (`GIT_SHA=dev`). `curl http://<ct-ip>:8080/api/update/status`
+- **Update button missing**: the feature self-disables when the image was built
+  locally (`GIT_SHA=dev`). `curl http://<ct-ip>:8080/api/update/status`
   (after unlock, with the session cookie) reports why via `enabled`/`error`.
 
 ## 8. Security posture
@@ -145,8 +140,8 @@ Exceptions:
 - App boots **locked**; every restart (including updates) returns to the unlock
   screen. Plaid access tokens are encrypted at rest; the key lives only in process
   memory after unlock.
-- `.env` holds Plaid keys + the GHCR PAT + the watchtower token: `chmod 600`, never
-  commit. Logs never contain tokens (`server/src/redact.ts`).
+- `.env` holds Plaid keys + the watchtower token: `chmod 600`, never commit. Logs
+  never contain tokens (`server/src/redact.ts`).
 - The watchtower API is reachable only on the internal compose network and requires
   the bearer token; the docker socket is exposed to watchtower only.
 

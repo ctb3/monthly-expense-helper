@@ -48,8 +48,9 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
   compares own SHA to the remote `:latest` revision label via GHCR registry API (checks on
   unlock, 6h interval started only in `isMain`, manual `POST /api/update/check`); header
   `UpdateButton` (client) installs via the watchtower sidecar's HTTP API
-  (`docker-compose.prod.yml`; dev compose unchanged). Feature self-disables unless
-  `GHCR_TOKEN` + real `GIT_SHA` (+ `WATCHTOWER_TOKEN` for apply) are set — dev/tests see
+  (`docker-compose.prod.yml`; dev compose unchanged). GHCR package is public → anonymous
+  token exchange; `GHCR_TOKEN` only needed if it goes private again. Feature self-disables
+  without a real `GIT_SHA` (+ `WATCHTOWER_TOKEN` for apply) — dev/tests see
   `enabled:false`. Apply response is expected to be lost (watchtower kills the container
   mid-request): server races a 5s timer, client polls `/api/status` down→up then reloads.
 
@@ -61,11 +62,12 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
   (match the sheet). Do not fix.
 - `.env` (Plaid production keys) and `data/*.csv` (real financial history) are
   gitignored — keep it that way; never log tokens (see `server/src/redact.ts`).
-- Plaid: free-trial account, 10 real connections (5 used: amex, citi, chase, usbank,
-  pnc; chase liabilities came back `unavailable`). Sandbox for testing
+- Plaid: free-trial account with a limited number of real connections (several in use;
+  one institution returns liabilities `unavailable`). Sandbox for testing
   (`user_good`/`pass_good`). OAuth works via desktop popup — no redirect URI (removed;
-  in git history if mobile webview linking ever needed). Amex consent expires annually
-  → Re-link button on Accounts.
+  in git history if mobile webview linking ever needed). Some issuers' consent expires
+  annually → Re-link button on Accounts. (Which institutions are linked lives in
+  private session memory, not this public file.)
 - Dev env is WSL2 with repo on /mnt/c: process startup is slow (wait several seconds
   before curling a fresh server); Vite must bind 0.0.0.0 (`host: true`) or the Windows
   browser can't reach it.

@@ -60,7 +60,7 @@ export class UpdateChecker {
     private cfg: Config['update'],
     private fetchFn: typeof fetch = fetch,
   ) {
-    this.enabled = Boolean(cfg.ghcrToken && cfg.currentSha && cfg.currentSha !== 'dev');
+    this.enabled = Boolean(cfg.currentSha && cfg.currentSha !== 'dev');
   }
 
   get status(): UpdateStatus {
@@ -150,11 +150,14 @@ export class UpdateChecker {
 
   private async fetchRemoteSha(): Promise<string> {
     const { registry, repository, tag } = parseImageRef(this.cfg.imageRef);
-    // GHCR token exchange: username is arbitrary, PAT goes in the password slot.
-    const basic = Buffer.from(`token:${this.cfg.ghcrToken}`).toString('base64');
+    // Token exchange. Public images get an anonymous token; for private ones set
+    // GHCR_TOKEN (username in the Basic pair is arbitrary, PAT is the password).
+    const authHeaders: Record<string, string> = this.cfg.ghcrToken
+      ? { authorization: `Basic ${Buffer.from(`token:${this.cfg.ghcrToken}`).toString('base64')}` }
+      : {};
     const tokenRes = await this.fetchFn(
       `https://${registry}/token?service=${registry}&scope=repository:${repository}:pull`,
-      { headers: { authorization: `Basic ${basic}` } },
+      { headers: authHeaders },
     );
     if (!tokenRes.ok) throw new CheckError(`registry auth failed (${tokenRes.status})`);
     const { token } = (await tokenRes.json()) as { token?: string };

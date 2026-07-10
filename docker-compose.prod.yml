@@ -2,9 +2,8 @@
 # GHCR instead of building locally, plus a watchtower sidecar that the app's
 # in-app "Install update" button drives via HTTP API.
 #
-# Host prep (once):
-#   docker login ghcr.io -u ctb3 -p <classic PAT with read:packages>
-#   fill GHCR_TOKEN / WATCHTOWER_TOKEN (and optionally IMAGE_REF) in .env
+# The GHCR package is public — no docker login or GHCR_TOKEN needed. Host prep:
+#   fill WATCHTOWER_TOKEN (and Plaid keys) in .env
 #   docker compose -f docker-compose.prod.yml up -d
 #
 # Config changes (.env / this file) still need a manual `up -d` — watchtower
@@ -39,7 +38,6 @@ services:
       # only when the app asks. Do not set WATCHTOWER_HTTP_API_PERIODIC_POLLS.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/config.json:ro # GHCR pull auth from `docker login`
     # No ports: the API is reachable only inside the compose network
     # at http://watchtower:8080.
 

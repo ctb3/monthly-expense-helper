@@ -20,9 +20,10 @@ npm run dev            # server :8080, client :5173 (proxied)
   seed category suggestions.
 - Test the full flow with `PLAID_ENV=sandbox` first (institution: any, credentials
   `user_good` / `pass_good`) — sandbox links don't consume free-trial connections.
-- Switch to `PLAID_ENV=production` and link Amex for real data. OAuth institutions
-  (Amex included) authenticate in a browser popup — no redirect URI setup needed on
-  desktop web. Amex consent expires yearly; use Re-link when sync starts failing.
+- Switch to `PLAID_ENV=production` and link your institutions for real data. OAuth
+  institutions (American Express included) authenticate in a browser popup — no
+  redirect URI setup needed on desktop web. Some issuers' consent expires yearly;
+  use Re-link when sync starts failing.
 
 ## Deployment (Proxmox LXC + Docker)
 
@@ -35,10 +36,8 @@ the short version:
 mkdir expense-helper && cd expense-helper
 # copy docker-compose.prod.yml and .env.example here
 cp .env.example .env && chmod 600 .env
-# edit .env: Plaid production keys, GHCR_TOKEN (read:packages PAT),
-#            WATCHTOWER_TOKEN=$(openssl rand -hex 32)
-docker login ghcr.io -u ctb3        # password = the same PAT
-docker compose -f docker-compose.prod.yml up -d
+# edit .env: Plaid production keys, WATCHTOWER_TOKEN=$(openssl rand -hex 32)
+docker compose -f docker-compose.prod.yml up -d   # image is public, no login needed
 ```
 
 Open `http://<host>:8080`, set the vault passphrase. Every push to `main` publishes a

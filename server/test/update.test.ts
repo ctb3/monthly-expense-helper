@@ -135,15 +135,33 @@ describe('UpdateChecker.check', () => {
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
-  it('is disabled without a token or with a dev sha', async () => {
+  it('is disabled with a dev or missing sha', async () => {
     const fetchMock = ghcrFetch(SHA_A);
-    for (const over of [{ ghcrToken: '' }, { currentSha: 'dev' }, { currentSha: '' }]) {
+    for (const over of [{ currentSha: 'dev' }, { currentSha: '' }]) {
       const checker = new UpdateChecker(updateCfg(over), fetchMock);
       expect(checker.enabled).toBe(false);
       expect((await checker.check()).enabled).toBe(false);
       await checker.checkIfStale();
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('exchanges tokens anonymously when no GHCR token is set (public image)', async () => {
+    const fetchMock = ghcrFetch(SHA_B);
+    const checker = new UpdateChecker(updateCfg({ ghcrToken: '' }), fetchMock);
+    expect((await checker.check()).remoteSha).toBe(SHA_B);
+    const tokenCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('/token?'))!;
+    expect((tokenCall[1] as RequestInit).headers).toEqual({});
+  });
+
+  it('sends Basic auth on token exchange when a GHCR token is set', async () => {
+    const fetchMock = ghcrFetch(SHA_A);
+    await new UpdateChecker(updateCfg(), fetchMock).check();
+    const tokenCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('/token?'))!;
+    const headers = (tokenCall[1] as RequestInit).headers as Record<string, string>;
+    expect(headers.authorization).toBe(
+      `Basic ${Buffer.from(`token:${PAT}`).toString('base64')}`,
+    );
   });
 });
 
