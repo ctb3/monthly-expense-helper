@@ -154,6 +154,24 @@ describe('UpdateChecker.check', () => {
     expect((tokenCall[1] as RequestInit).headers).toEqual({});
   });
 
+  it('falls back to anonymous token exchange when a stale PAT is rejected', async () => {
+    const inner = ghcrFetch(SHA_B);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      if (String(input).includes('/token?') && headers.authorization?.startsWith('Basic ')) {
+        return jsonRes({}, 403);
+      }
+      return inner(input, init);
+    }) as unknown as typeof fetch & ReturnType<typeof vi.fn>;
+    const checker = new UpdateChecker(updateCfg(), fetchMock);
+    const status = await checker.check();
+    expect(status.error).toBeNull();
+    expect(status.remoteSha).toBe(SHA_B);
+    const tokenCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes('/token?'));
+    expect(tokenCalls).toHaveLength(2);
+    expect((tokenCalls[1][1] as RequestInit).headers).toEqual({});
+  });
+
   it('sends Basic auth on token exchange when a GHCR token is set', async () => {
     const fetchMock = ghcrFetch(SHA_A);
     await new UpdateChecker(updateCfg(), fetchMock).check();

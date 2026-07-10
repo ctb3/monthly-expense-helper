@@ -155,10 +155,13 @@ export class UpdateChecker {
     const authHeaders: Record<string, string> = this.cfg.ghcrToken
       ? { authorization: `Basic ${Buffer.from(`token:${this.cfg.ghcrToken}`).toString('base64')}` }
       : {};
-    const tokenRes = await this.fetchFn(
-      `https://${registry}/token?service=${registry}&scope=repository:${repository}:pull`,
-      { headers: authHeaders },
-    );
+    const tokenUrl = `https://${registry}/token?service=${registry}&scope=repository:${repository}:pull`;
+    let tokenRes = await this.fetchFn(tokenUrl, { headers: authHeaders });
+    // A stale/revoked GHCR_TOKEN gets 401/403 even though a public image needs
+    // no auth at all — retry anonymously before giving up.
+    if (!tokenRes.ok && this.cfg.ghcrToken && (tokenRes.status === 401 || tokenRes.status === 403)) {
+      tokenRes = await this.fetchFn(tokenUrl, { headers: {} });
+    }
     if (!tokenRes.ok) throw new CheckError(`registry auth failed (${tokenRes.status})`);
     const { token } = (await tokenRes.json()) as { token?: string };
     if (!token) throw new CheckError('registry auth returned no token');
