@@ -29,9 +29,14 @@ cid=$(dc ps -aq app)
 [ -n "$cid" ] || { echo "error: app container not found — run 'docker compose -f $COMPOSE up -d' once first" >&2; exit 1; }
 
 docker cp "$SNAPSHOT" "$cid":/data/expense.db
-# docker cp writes as root; the app runs as 'node' and SQLite must create
-# -wal/-shm files next to the DB.
-dc run --rm --user root app chown node:node /data/expense.db
+# Two fixups in one shot:
+# - stale -wal/-shm from a previous run MUST go: SQLite would "recover" that
+#   old WAL over the freshly copied DB on next open, silently reverting it
+#   (symptom: app offers first-run setup again despite a good copy);
+# - docker cp writes as root; the app runs as 'node' and SQLite must create
+#   new -wal/-shm files next to the DB.
+dc run --rm --user root app \
+  sh -c 'rm -f /data/expense.db-wal /data/expense.db-shm && chown node:node /data/expense.db'
 dc start app
 
 echo "done — open the app and unlock with the snapshot's passphrase"
