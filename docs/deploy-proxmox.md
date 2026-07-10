@@ -89,31 +89,17 @@ Open `http://<ct-ip>:8080`.
   stays whatever it was on the old DB):
 
   ```bash
-  # On the dev machine: do NOT copy expense.db directly — the DB runs in WAL
-  # mode and most data usually sits in expense.db-wal, so the bare main file
-  # is near-empty (symptom: 4 kB file, app offers first-run setup). Make a
-  # single-file snapshot instead (safe while the dev server runs):
-  cd server && npx tsx -e "
-  const Database = require('better-sqlite3');
-  const db = new Database('var/expense.db');
-  db.exec(\"VACUUM INTO 'var/expense-migrate.db'\");
-  db.close();"
-  #   scp server/var/expense-migrate.db root@<ct-ip>:/opt/expense-helper/
+  # On the dev machine — do NOT copy expense.db directly (WAL mode: most data
+  # sits in expense.db-wal; the bare main file is a near-empty 4 kB and the app
+  # would offer first-run setup). Snapshot instead (safe while dev server runs):
+  npm run db:snapshot          # writes server/var/expense-migrate.db (VACUUM INTO)
+  scp server/var/expense-migrate.db root@<ct-ip>:/opt/expense-helper/
 
-  # On the LXC:
+  # On the LXC (script stops the app, copies the DB in, fixes ownership
+  # for the non-root app user, restarts):
   cd /opt/expense-helper
-  docker compose -f docker-compose.prod.yml stop app
-
-  # -aq, not -q: plain `ps -q` lists only RUNNING containers, so after `stop`
-  # it returns nothing and docker cp fails with "must specify at least one
-  # container source".
-  docker cp expense-migrate.db "$(docker compose -f docker-compose.prod.yml ps -aq app)":/data/expense.db
-
-  # docker cp writes the file as root, but the app runs as user `node` and
-  # SQLite must be able to create -wal/-shm files next to the DB:
-  docker compose -f docker-compose.prod.yml run --rm --user root app chown node:node /data/expense.db
-
-  docker compose -f docker-compose.prod.yml start app
+  curl -fsSLO https://raw.githubusercontent.com/ctb3/monthly-expense-helper/main/scripts/migrate-db.sh
+  bash migrate-db.sh
   ```
 
   Unlock with the passphrase the old DB already had.
