@@ -27,7 +27,9 @@ services:
       - com.centurylinklabs.watchtower.enable=true
 
   watchtower:
-    image: containrrr/watchtower
+    # Maintained fork (containrrr/watchtower archived Dec 2025; this one
+    # autonegotiates the Docker API version instead of crashing on new engines).
+    image: ghcr.io/nicholas-fedor/watchtower:latest
     restart: unless-stopped
     environment:
       WATCHTOWER_HTTP_API_UPDATE: "true"
