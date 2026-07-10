@@ -69,9 +69,20 @@ export function UpdateButton({ onAuthError }: { onAuthError: (err: unknown) => b
         return;
       } else if (Date.now() - started > 90_000) {
         // Never went down: image was already current; watchtower had nothing to do.
+        // Force a fresh registry check, not just a status re-read — the cached
+        // comparison that made us think an update existed could itself be stale
+        // (e.g. mid-cutover to a renamed image), and a plain status re-read would
+        // just echo that same stale mismatch back, offering the same no-op
+        // "update" forever.
+        try {
+          const s = await api<UpdateStatusResp>('/api/update/check', { method: 'POST' });
+          setStatus(s);
+          if (s.error) flash(`Check failed: ${s.error}`, 'error');
+          else if (!s.updateAvailable) flash(`Up to date (${shortSha(s.currentSha)})`);
+        } catch {
+          void loadStatus();
+        }
         setPhase('idle');
-        setMsg(null);
-        void loadStatus();
         return;
       }
     }
