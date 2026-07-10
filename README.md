@@ -1,4 +1,4 @@
-# monthly-expense-helper
+# expense-helper
 
 Automates the monthly expense routine: pull card/bank transactions via Plaid, review
 and categorize them in a small local web UI (with learned category suggestions), then
@@ -34,7 +34,7 @@ the short version:
 ```bash
 # Debian LXC (unprivileged, features: nesting=1) with docker + compose plugin
 mkdir expense-helper && cd expense-helper
-base=https://raw.githubusercontent.com/ctb3/monthly-expense-helper/main
+base=https://raw.githubusercontent.com/ctb3/expense-helper/main
 curl -fsSLO $base/docker-compose.prod.yml && curl -fsSLO $base/.env.example
 cp .env.example .env && chmod 600 .env
 # edit .env: Plaid production keys, WATCHTOWER_TOKEN=$(openssl rand -hex 32)

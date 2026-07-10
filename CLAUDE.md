@@ -1,4 +1,4 @@
-# monthly-expense-helper
+# expense-helper
 
 Personal app automating monthly expenses: Plaid pulls card transactions, web UI
 categorizes them (learned merchant memory + Plaid category fallback), exports CSV/TSV
@@ -42,7 +42,7 @@ that pastes into the user's Google Sheet. Solo user, LAN-only, security-sensitiv
 - Lost auth: `syncItem` catches `ITEM_LOGIN_REQUIRED` and sets `items.status='login_required'`
   (a successful sync sets it back to `'active'`). Sync All flags dead items automatically;
   unlock (login) auto-runs Sync All so the dashboard surfaces re-auth needs immediately.
-- Self-update: CI (`.github/workflows/publish.yml`) pushes `ghcr.io/ctb3/monthly-expense-helper`
+- Self-update: CI (`.github/workflows/publish.yml`) pushes `ghcr.io/ctb3/expense-helper`
   (`:latest` + `:sha-<sha>`, provenance off so `:latest` is a plain manifest) with the full
   git SHA baked in (`ENV GIT_SHA` + revision label). `server/src/update.ts` `UpdateChecker`
   compares own SHA to the remote `:latest` revision label via GHCR registry API (checks on

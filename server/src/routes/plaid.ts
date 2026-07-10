@@ -14,7 +14,7 @@ export function plaidRoutes(app: FastifyInstance, deps: AppDeps): void {
       // in a popup. Only mobile webviews would need a registered redirect URI.
       const base = {
         user: { client_user_id: 'local-user' },
-        client_name: 'Monthly Expense Helper',
+        client_name: 'Expense Helper',
         country_codes: [CountryCode.Us],
         language: 'en',
       };

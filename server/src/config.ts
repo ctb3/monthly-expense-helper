@@ -34,7 +34,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       env: plaidEnv,
     },
     update: {
-      imageRef: env.IMAGE_REF ?? 'ghcr.io/ctb3/monthly-expense-helper:latest',
+      imageRef: env.IMAGE_REF ?? 'ghcr.io/ctb3/expense-helper:latest',
       ghcrToken: env.GHCR_TOKEN ?? '',
       watchtowerUrl: env.WATCHTOWER_URL ?? 'http://watchtower:8080',
       watchtowerToken: env.WATCHTOWER_TOKEN ?? '',

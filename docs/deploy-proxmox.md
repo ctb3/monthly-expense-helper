@@ -12,10 +12,10 @@ The docker socket is mounted only into watchtower, never into the app.
 ## 1. GitHub bootstrap (once per GitHub account, survives rebuilds)
 
 1. **Image exists**: any push to `main` publishes
-   `ghcr.io/ctb3/monthly-expense-helper:latest` + `:sha-<full-sha>`. Check under
+   `ghcr.io/ctb3/expense-helper:latest` + `:sha-<full-sha>`. Check under
    GitHub profile → Packages after the first CI run.
 2. **Package is public** (repo and image contain no secrets; the DB and `.env` never
-   enter the image): Packages → `monthly-expense-helper` → Package settings →
+   enter the image): Packages → `expense-helper` → Package settings →
    visibility Public. Public means anonymous pulls — no PAT, no `docker login`, and
    the in-app checker exchanges tokens anonymously. If you ever make it private
    again, create a **classic** PAT with only `read:packages` (fine-grained PATs
@@ -54,7 +54,7 @@ https://docs.docker.com/engine/install/debian/ — same result.)
 mkdir -p /opt/expense-helper && cd /opt/expense-helper
 
 # Only two files are needed on the host (the app itself ships in the image):
-base=https://raw.githubusercontent.com/ctb3/monthly-expense-helper/main
+base=https://raw.githubusercontent.com/ctb3/expense-helper/main
 curl -fsSLO $base/docker-compose.prod.yml
 curl -fsSLO $base/.env.example
 
@@ -98,7 +98,7 @@ Open `http://<ct-ip>:8080`.
   # On the LXC (script stops the app, copies the DB in, fixes ownership
   # for the non-root app user, restarts):
   cd /opt/expense-helper
-  curl -fsSLO https://raw.githubusercontent.com/ctb3/monthly-expense-helper/main/scripts/migrate-db.sh
+  curl -fsSLO https://raw.githubusercontent.com/ctb3/expense-helper/main/scripts/migrate-db.sh
   bash migrate-db.sh
   ```
 
@@ -132,7 +132,7 @@ Exceptions:
   *existing* config only — apply config changes manually:
   `docker compose -f docker-compose.prod.yml up -d`
 - **Rollback**: edit `image:` in `docker-compose.prod.yml` to
-  `ghcr.io/ctb3/monthly-expense-helper:sha-<full-sha>` (and set `IMAGE_REF` in
+  `ghcr.io/ctb3/expense-helper:sha-<full-sha>` (and set `IMAGE_REF` in
   `.env` to match so the app stops offering `:latest`), then `up -d`.
 - **Stuck/failed update**: `docker logs $(docker ps -qf name=watchtower)` shows the
   pull/recreate attempt. Manual fallback always works:

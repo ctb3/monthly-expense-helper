@@ -10,7 +10,7 @@ const PAT = 'ghp_supersecretpat';
 
 function updateCfg(over: Partial<ReturnType<typeof updateCfg>> = {}) {
   return {
-    imageRef: 'ghcr.io/ctb3/monthly-expense-helper:latest',
+    imageRef: 'ghcr.io/ctb3/expense-helper:latest',
     ghcrToken: PAT,
     watchtowerUrl: 'http://watchtower:8080',
     watchtowerToken: 'wt-token',
@@ -60,9 +60,9 @@ afterEach(() => {
 
 describe('parseImageRef', () => {
   it('splits registry, repository, and tag', () => {
-    expect(parseImageRef('ghcr.io/ctb3/monthly-expense-helper:latest')).toEqual({
+    expect(parseImageRef('ghcr.io/ctb3/expense-helper:latest')).toEqual({
       registry: 'ghcr.io',
-      repository: 'ctb3/monthly-expense-helper',
+      repository: 'ctb3/expense-helper',
       tag: 'latest',
     });
   });
@@ -98,7 +98,7 @@ describe('UpdateChecker.check', () => {
     expect((await checker.check()).remoteSha).toBe(SHA_B);
     const urls = fetchMock.mock.calls.map((c) => String(c[0]));
     expect(urls).toContain(
-      'https://ghcr.io/v2/ctb3/monthly-expense-helper/manifests/sha256:amd64manifest',
+      'https://ghcr.io/v2/ctb3/expense-helper/manifests/sha256:amd64manifest',
     );
     expect(urls.some((u) => u.includes('sha256:attest'))).toBe(false);
   });

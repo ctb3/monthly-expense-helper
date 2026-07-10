@@ -31,7 +31,7 @@ jobs:
           build-args: |
             GIT_SHA=${{ github.sha }}
           tags: |
-            ghcr.io/ctb3/monthly-expense-helper:latest
-            ghcr.io/ctb3/monthly-expense-helper:sha-${{ github.sha }}
+            ghcr.io/ctb3/expense-helper:latest
+            ghcr.io/ctb3/expense-helper:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
