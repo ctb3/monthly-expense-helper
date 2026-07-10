@@ -89,12 +89,27 @@ Open `http://<ct-ip>:8080`.
   stays whatever it was on the old DB):
 
   ```bash
+  # On the dev machine: STOP the dev server first (checkpoints SQLite's WAL into
+  # the main file), then ship the DB over:
+  #   scp server/var/expense.db root@<ct-ip>:/opt/expense-helper/
+
+  # On the LXC:
+  cd /opt/expense-helper
   docker compose -f docker-compose.prod.yml stop app
-  docker cp expense.db $(docker compose -f docker-compose.prod.yml ps -q app):/data/expense.db
-  # or copy straight into the volume:
-  #   /var/lib/docker/volumes/expense-helper_expense-data/_data/expense.db
+
+  # -aq, not -q: plain `ps -q` lists only RUNNING containers, so after `stop`
+  # it returns nothing and docker cp fails with "must specify at least one
+  # container source".
+  docker cp expense.db "$(docker compose -f docker-compose.prod.yml ps -aq app)":/data/expense.db
+
+  # docker cp writes the file as root, but the app runs as user `node` and
+  # SQLite must be able to create -wal/-shm files next to the DB:
+  docker compose -f docker-compose.prod.yml run --rm --user root app chown node:node /data/expense.db
+
   docker compose -f docker-compose.prod.yml start app
   ```
+
+  Unlock with the passphrase the old DB already had.
 
 Sanity check: hover **Check for updates** in the header — the tooltip shows the
 running git SHA; clicking it should say **Up to date**.
