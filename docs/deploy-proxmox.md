@@ -89,9 +89,16 @@ Open `http://<ct-ip>:8080`.
   stays whatever it was on the old DB):
 
   ```bash
-  # On the dev machine: STOP the dev server first (checkpoints SQLite's WAL into
-  # the main file), then ship the DB over:
-  #   scp server/var/expense.db root@<ct-ip>:/opt/expense-helper/
+  # On the dev machine: do NOT copy expense.db directly — the DB runs in WAL
+  # mode and most data usually sits in expense.db-wal, so the bare main file
+  # is near-empty (symptom: 4 kB file, app offers first-run setup). Make a
+  # single-file snapshot instead (safe while the dev server runs):
+  cd server && npx tsx -e "
+  const Database = require('better-sqlite3');
+  const db = new Database('var/expense.db');
+  db.exec(\"VACUUM INTO 'var/expense-migrate.db'\");
+  db.close();"
+  #   scp server/var/expense-migrate.db root@<ct-ip>:/opt/expense-helper/
 
   # On the LXC:
   cd /opt/expense-helper
@@ -100,7 +107,7 @@ Open `http://<ct-ip>:8080`.
   # -aq, not -q: plain `ps -q` lists only RUNNING containers, so after `stop`
   # it returns nothing and docker cp fails with "must specify at least one
   # container source".
-  docker cp expense.db "$(docker compose -f docker-compose.prod.yml ps -aq app)":/data/expense.db
+  docker cp expense-migrate.db "$(docker compose -f docker-compose.prod.yml ps -aq app)":/data/expense.db
 
   # docker cp writes the file as root, but the app runs as user `node` and
   # SQLite must be able to create -wal/-shm files next to the DB:
