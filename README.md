@@ -5,16 +5,6 @@ and categorize them in a small local web UI (with learned category suggestions),
 export a CSV that pastes straight into the expense spreadsheet
 (`Date, Price, Category, Subcategory, Source, Note`).
 
-## Monthly workflow
-
-1. **Unlock** the app with your vault passphrase.
-2. **Accounts → Sync now** on each linked institution.
-3. **Transactions**: pick the month (or a custom range). Categories are pre-filled from
-   merchant history / Plaid guesses; fix any that are wrong — every manual pick saves
-   instantly and teaches the merchant memory.
-4. **Download CSV** (combined or per-card) from the same screen, paste into the sheet.
-5. Pay the cards (dashboard for verifying payments is a planned future feature).
-
 ## First-time setup
 
 ```bash
