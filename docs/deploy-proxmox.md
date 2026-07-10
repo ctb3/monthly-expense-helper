@@ -159,13 +159,3 @@ Exceptions:
 `docker compose up -d --build` with the dev `docker-compose.yml` builds on the box
 and runs without watchtower. The in-app updater stays disabled (`GIT_SHA=dev`) —
 updates are `git pull && docker compose up -d --build`.
-
-## Amex / OAuth institutions
-
-OAuth institutions (Amex included) authenticate in a **browser popup** on desktop
-web — no redirect URI registration needed. Link from a desktop browser and allow
-popups. A registered HTTPS redirect URI (Plaid dashboard → Developers → API →
-Allowed redirect URIs) only becomes necessary if you ever link from a mobile
-webview.
-
-Amex consent expires annually: when its sync starts failing, use the Re-link button.
