@@ -1,68 +1,167 @@
-# Deploying on Proxmox (Docker, LAN-only)
+# Deployment playbook — Proxmox LXC, from scratch
 
-## Where to run it
+Complete rebuild instructions. Follow top to bottom on a fresh Proxmox node and you
+end with the app running, self-updating, and backed up. Skip sections that already
+exist (e.g. the GitHub bootstrap survives a dead LXC).
 
-Create a small VM (or LXC with nesting enabled) on Proxmox running Debian/Ubuntu with
-Docker + the compose plugin. 1 vCPU / 1 GB RAM / 8 GB disk is plenty — the app is a
-single Node process with SQLite.
+Architecture: a Debian LXC runs Docker Compose with two containers — the app (image
+pulled from GHCR, built by `.github/workflows/publish.yml` on every push to `main`)
+and a watchtower sidecar whose HTTP API the app's **Install update** button drives.
+The docker socket is mounted only into watchtower, never into the app.
 
-LXC note: Docker-in-LXC needs `features: nesting=1,keyctl=1` on the container. A VM
-avoids that entirely and is the lower-friction choice.
+## 1. GitHub bootstrap (once per GitHub account, survives rebuilds)
 
-## Install
+1. **Image exists**: any push to `main` publishes
+   `ghcr.io/ctb3/monthly-expense-helper:latest` + `:sha-<full-sha>`. Check under
+   GitHub profile → Packages after the first CI run.
+2. **Package must be private**: Packages → `monthly-expense-helper` → Package
+   settings → visibility Private (first push usually inherits repo visibility —
+   verify anyway).
+3. **Pull token**: GitHub → Settings → Developer settings → Personal access tokens →
+   **Tokens (classic)** → Generate. Scope: **only `read:packages`**. Must be a
+   classic token — fine-grained PATs cannot authenticate to GHCR. Note the expiry:
+   when it lapses, the in-app update check starts reporting
+   `registry auth failed (401)` — that's the renewal reminder.
 
-Production pulls the CI-built image from GHCR (`.github/workflows/publish.yml` pushes
-on every push to main) instead of building on the box:
+## 2. Create the LXC (Proxmox 9.x)
+
+1. Node → local storage → **CT Templates** → download **Debian 13 (bookworm's
+   successor / current stable)**.
+2. Create CT:
+   - **Unprivileged**: yes
+   - Cores: 2, RAM: 1–2 GB, Disk: 8 GB (plenty — one Node process + SQLite)
+   - Network: DHCP or static on the LAN; note the IP
+3. After creation, CT → Options → **Features** → enable **nesting** (Docker-in-LXC
+   requirement). If Docker later fails to start, also enable **keyctl**.
+4. Start the CT and open its console (root, no password by default on console).
+
+## 3. Install Docker in the CT
 
 ```bash
-mkdir expense-helper && cd expense-helper
-# fetch docker-compose.prod.yml + .env.example from the repo (or clone it)
-cp .env.example .env
-chmod 600 .env
-# edit .env: PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV=production,
-#            GHCR_TOKEN (classic PAT, read:packages only),
-#            WATCHTOWER_TOKEN (openssl rand -hex 32)
-docker login ghcr.io -u ctb3   # password = the same PAT; watchtower reuses this auth
-docker compose -f docker-compose.prod.yml up -d
+apt update && apt install -y curl
+curl -fsSL https://get.docker.com | sh
+docker --version && docker compose version   # sanity check
 ```
 
-Open `http://<vm-ip>:8080`, set the vault passphrase on first run.
+(`get.docker.com` installs the engine + compose plugin from Docker's apt repo.
+Manual-repo alternative if you distrust the script: follow
+https://docs.docker.com/engine/install/debian/ — same result.)
 
-(`docker compose up -d --build` with the dev `docker-compose.yml` still works for a
-build-on-box install, but the in-app updater stays disabled there — the local image
-has `GIT_SHA=dev` and watchtower can only pull registry images.)
+## 4. Stage the app
 
-## Security posture
+```bash
+mkdir -p /opt/expense-helper && cd /opt/expense-helper
 
-- **No inbound from the internet.** The app pulls from Plaid; nothing needs to reach it.
-  Do not port-forward it on your router. If you want access away from home, use a VPN
-  into the LAN (WireGuard/Tailscale) rather than exposing the port.
-- **Plaid access tokens** are AES-256-GCM encrypted in SQLite; the key exists only in
-  process memory after you enter the passphrase. Every container restart returns to the
-  locked state.
-- **`.env` holds the Plaid API keys.** Keep it `chmod 600`, never commit it. To move off
-  the filesystem entirely, switch to Docker secrets: put each value in
-  `/run/secrets/...` via the compose `secrets:` block and export them in an entrypoint.
-- **Backups**: the named volume `expense-data` holds the DB. `docker run --rm
-  -v expense-helper_expense-data:/data -v $PWD:/backup alpine tar czf
-  /backup/expense-backup.tgz /data`. Backups are safe to store as-is — tokens in them
-  are useless without the passphrase — but treat them as sensitive anyway (transaction
-  history is in plaintext).
-- **Updates**: push to main → CI publishes `ghcr.io/ctb3/monthly-expense-helper:latest`
-  → the app's header shows **Install update** (it checks the registry on unlock, every
-  6 h, and via **Check for updates**) → one click has the watchtower sidecar pull the
-  image and recreate the container. The app comes back locked; unlock as usual.
-  - Manual fallback: `docker compose -f docker-compose.prod.yml pull && docker compose
-    -f docker-compose.prod.yml up -d`.
-  - `.env`/compose changes are **not** picked up by watchtower — run `up -d` manually.
-  - Rollback: point `image:` (or `IMAGE_REF`) at a `:sha-<full-sha>` tag and `up -d`.
+# Get the two deploy files from the repo — scp from a machine with a checkout,
+# or download raw from GitHub:
+#   docker-compose.prod.yml
+#   .env.example
+cp .env.example .env
+chmod 600 .env
+```
+
+Edit `.env`:
+
+| Var | Value |
+| --- | --- |
+| `PLAID_CLIENT_ID` / `PLAID_SECRET` | from the Plaid dashboard (Developers → Keys) |
+| `PLAID_ENV` | `production` |
+| `GHCR_TOKEN` | the classic PAT from §1.3 |
+| `WATCHTOWER_TOKEN` | `openssl rand -hex 32` |
+| `IMAGE_REF`, `WATCHTOWER_URL` | leave at defaults (or delete — defaults are built in) |
+
+Authenticate Docker for private pulls (watchtower reuses the resulting
+`/root/.docker/config.json`, which the compose file mounts into it):
+
+```bash
+docker login ghcr.io -u ctb3     # password prompt: paste the same PAT
+```
+
+## 5. First start
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml ps    # app + watchtower both "Up"
+```
+
+Open `http://<ct-ip>:8080`.
+
+- **Fresh install**: first unlock sets a new vault passphrase (10+ chars, no
+  recovery), then link institutions on Accounts and import the historical CSV to
+  seed merchant memory.
+- **Migrating an existing DB** (keeps Plaid links + history; the vault passphrase
+  stays whatever it was on the old DB):
+
+  ```bash
+  docker compose -f docker-compose.prod.yml stop app
+  docker cp expense.db $(docker compose -f docker-compose.prod.yml ps -q app):/data/expense.db
+  # or copy straight into the volume:
+  #   /var/lib/docker/volumes/expense-helper_expense-data/_data/expense.db
+  docker compose -f docker-compose.prod.yml start app
+  ```
+
+Sanity check: hover **Check for updates** in the header — the tooltip shows the
+running git SHA; clicking it should say **Up to date**.
+
+## 6. Backups
+
+Datacenter → Backup → add a job covering this CT (the docker volume holding
+`expense.db` and the `.env` file both live inside the CT's disk, so a vzdump
+snapshot captures everything). `.env` contains Plaid production keys — keep backup
+storage trusted; PBS with encryption is ideal. The DB's Plaid tokens are
+AES-256-GCM encrypted and useless without the passphrase, but transaction history
+is plaintext — treat backups as sensitive.
+
+Restoring the CT from backup restores the whole stack; after restore, just start
+the CT and unlock.
+
+## 7. Updates (steady state)
+
+Push to `main` → CI publishes in ~2 min → app header shows **Install update**
+(detected on unlock, every 6 h, or via **Check for updates**) → click, confirm →
+watchtower pulls the image and recreates the app container → the page reloads onto
+the unlock screen → unlock. Data volume and `.env` are untouched.
+
+Exceptions:
+
+- **`.env` or compose file changed**: watchtower recreates containers with their
+  *existing* config only — apply config changes manually:
+  `docker compose -f docker-compose.prod.yml up -d`
+- **Rollback**: edit `image:` in `docker-compose.prod.yml` to
+  `ghcr.io/ctb3/monthly-expense-helper:sha-<full-sha>` (and set `IMAGE_REF` in
+  `.env` to match so the app stops offering `:latest`), then `up -d`.
+- **Stuck/failed update**: `docker logs $(docker ps -qf name=watchtower)` shows the
+  pull/recreate attempt. Manual fallback always works:
+  `docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d`
+- **Update button missing**: the feature self-disables when `GHCR_TOKEN` is unset
+  or the image was built locally (`GIT_SHA=dev`). `curl http://<ct-ip>:8080/api/update/status`
+  (after unlock, with the session cookie) reports why via `enabled`/`error`.
+
+## 8. Security posture
+
+- **No inbound from the internet.** The app pulls from Plaid; nothing needs to
+  reach it. Never port-forward it. Remote access = VPN into the LAN
+  (WireGuard/Tailscale).
+- App boots **locked**; every restart (including updates) returns to the unlock
+  screen. Plaid access tokens are encrypted at rest; the key lives only in process
+  memory after unlock.
+- `.env` holds Plaid keys + the GHCR PAT + the watchtower token: `chmod 600`, never
+  commit. Logs never contain tokens (`server/src/redact.ts`).
+- The watchtower API is reachable only on the internal compose network and requires
+  the bearer token; the docker socket is exposed to watchtower only.
+
+## Dev-box alternative (no GHCR, no updater)
+
+`docker compose up -d --build` with the dev `docker-compose.yml` builds on the box
+and runs without watchtower. The in-app updater stays disabled (`GIT_SHA=dev`) —
+updates are `git pull && docker compose up -d --build`.
 
 ## Amex / OAuth institutions
 
-OAuth institutions (Amex included) authenticate in a **browser popup** on desktop web —
-no redirect URI registration needed. Just click Link on the Accounts page from a
-desktop browser and allow popups. A registered HTTPS redirect URI (Plaid dashboard →
-Developers → API → Allowed redirect URIs) only becomes necessary if you ever link from
-a mobile webview.
+OAuth institutions (Amex included) authenticate in a **browser popup** on desktop
+web — no redirect URI registration needed. Link from a desktop browser and allow
+popups. A registered HTTPS redirect URI (Plaid dashboard → Developers → API →
+Allowed redirect URIs) only becomes necessary if you ever link from a mobile
+webview.
 
 Amex consent expires annually: when its sync starts failing, use the Re-link button.
